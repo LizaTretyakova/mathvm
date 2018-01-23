@@ -17,6 +17,8 @@ int main(int argc, char** argv) {
         impl = "jit";
       }  if (string(argv[i]) == "-p") {
         impl = "printer";
+      } if (string(argv[i]) == "-i") {
+        impl = "interpreter";
       } else {
         script = argv[i];
       }
