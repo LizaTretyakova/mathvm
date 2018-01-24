@@ -160,15 +160,28 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         VatType type_zero = type_stack.pop();
         VarType type_expr = type_stack.pop();
         if(type_zero == VT_INT && type_expr == VT_INT) {
-            // if `cond == 0`, i.e. false -- jump to "after `then`"
+            // if `cond == 0`, i.e. false -- jump to "after block"
             translated_function.bytecode()->addInsn(BC_IFICMPE);
             uint32_t index = translated_function.bytecode()->current();
-            translated_function.bytecode()->addTyped<int16_t>(0); // temporarily
+            translated_function.bytecode()->addInt16(0); // temporarily
             return index;
         }
 
         invalidate();
         return 0;
+    }
+
+    void push_load_i(uint16_t scope_id, uint16_t var_id) {
+        translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
+        translated_function.bytecode()->addTyped(scope_id);
+        translated_function.bytecode()->addTyped(var_id);
+        type_stack.push(VT_INT);
+    }
+
+    void push_store_i(uint16_t scope_id, uint16_t var_id) {
+        translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
+        translated_function.bytecode()->addTyped(scope_id);
+        translated_function.bytecode()->addTyped(var_id);
     }
 
     uint16_t store_scope() {
@@ -391,47 +404,143 @@ public:
     virtual void visitForNode(ForNode* node) {
         cerr << "[For]" << endl;
 
-        pout << "for (" << node->var()->name() << " in ";
-        node->inExpr()->visit(this);
-        pout << ") {\n";
+//        pout << "for (" << node->var()->name() << " in ";
+//        node->inExpr()->visit(this);
+//        pout << ") {\n";
+//        node->body()->visit(this);
+//        pout << indent << "}\n";
+//        need_semicolon = false;
+
+
+        // get and check the condition
+        BinaryOpNode* range = node->inExpr();
+        TokenKind op = range->kind();
+        if(op != tRANGE) {
+            cerr << "non-range op in for" << std::endl;
+            invalidate();
+            return;
+        }
+
+        // evaluate the condition start
+        range->left()->visit(this);
+
+        // load to var
+        const AstVar* var = node->var();
+        Scope* scope = var->owner();
+        uint16_t scope_id = store_scope(scope);
+        uint16_t var_id = store_var(scope, var);
+
+        VarType type = var->type();
+        if(type != VT_INT) {
+            cerr << "non-int iterator in for" << endl;
+            invalidate();
+            return;
+        }
+        push_store_i(scope_id, var_id);
+
+        uint32_t to_cond_pos = translated_function.bytecode()->current();
+
+        // make while
+        push_load_i(scope_id, var_id);
+//        translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
+//        translated_function.bytecode()->addTyped(scope_id);
+//        translated_function.bytecode()->addTyped(var_id);
+//        type_stack.push(VT_INT);
+
+        // range --> <
+        range->right()->visit(this);
+        type = update_type_stack_un();
+        if(type != VT_INT) {
+            cerr << "non-int cond in for" << endl;
+            invalidate();
+            return;
+        }
+
+        // set jump
+        translated_function.bytecode()->addInsn(BC_IFICMPG);
+        uint32_t second_jmp_pos = translated_function.bytecode()->current();
+        translated_function.bytecode()->addInt16(0);
+
+        // loop body
         node->body()->visit(this);
-        pout << indent << "}\n";
-        need_semicolon = false;
+
+        // set incr
+        translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
+        translated_function.bytecode()->addTyped(scope_id);
+        translated_function.bytecode()->addTyped(var_id);
+        type_stack.push(VT_INT);
+        translated_function.bytecode()->addInsn(BC_ILOAD1);
+        type_stack.push(VT_INT);
+        translated_function.bytecode()->addInsn(BC_IADD);
+        type = update_type_stack();
+        assert(type == VT_INT);
+        translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
+        translated_function.bytecode()->addTyped(scope_id);
+        translated_function.bytecode()->addTyped(var_id);
+
+        // jump
+        translated_function.bytecode()->addInsn(BC_JA);
+        translated_function.bytecode()->addInt16(0);
+        uint32_t first_after_loop_pos = translated_function.bytecode()->current();
+        uint32_t_t offset = to_cond_pos - first_after_loop_pos;
+        assert(offset == (int16_t)offset);
+        translated_function.bytecode()->setInt16(first_after_loop_pos - 1, (int16_t)offset);
     }
 
     virtual void visitWhileNode(WhileNode* node) {
         cerr << "[While]" << endl;
 
-        pout << "while(";
+        uint32_t first_jmp_pos = translated_function.bytecode()->current();
+
         node->whileExpr()->visit(this);
-        pout << ") {\n";
+        translated_function.bytecode()->addInsn(BC_ILOAD0);
+        type_stack.push(VT_INT);
+
+        uint32_t second_jmp_pos = push_jump();
+
         node->loopBlock()->visit(this);
-        pout << create_indent(indent_size - indent_shift) << "}\n";
-        need_semicolon = false;
+        translated_function.bytecode()->addInsn(BC_JA);
+        uint32_t first_after_loop_pos = translated_function.bytecode()->current();
+        uint32_t_t offset = first_jmp_pos - first_after_loop_pos;
+        assert(offset == (int16_t)offset);
+        translated_function.bytecode()->addInt16(offset);
+
+        uint32_t after_loop = translated_function.bytecode()->current();
+        int16_t offset2 = after_loop - second_jmp_pos;
+        assert(offset2 == (int16_t)offset2);
+        translated_function.bytecode()->setInt16(second_jmp_pos, offset2);
     }
 
     virtual void visitIfNode(IfNode* node) {
         cerr << "[If]" << endl;
 
-//        pout << "if (";
-//        node->ifExpr()->visit(this);
-//        pout << ") {\n";
-//        node->thenBlock()->visit(this);
-//        cerr << "[IF indent_size " << indent_size << "]" << endl;
-//        pout << indent << "}";
-//        BlockNode* elseBlock = node->elseBlock();
-//        if (elseBlock) {
-//            pout << " else {";
-//            elseBlock->visit(this);
-//            pout << indent << "}";
-//        }
-//        pout << "\n";
-//        need_semicolon = false;
-
+        // If...
         node->ifExpr()->visit(this);
         translated_function.bytecode()->addInsn(BC_ILOAD0);
-        push_jump(...);
-        translated_function.bytecode()->addInsn();
+        type_stack.push(VT_INT);
+        uint32_t first_jmp_pos = push_jump();
+
+        // ... then ...
+        node->thenBlock()->visit(this);
+        uint32_t after_then_pos = translated_function.bytecode()->current();
+
+        uint32_t offset = after_then_pos - first_jmp_pos;
+        assert(offset == (int16_t)offset);
+        translated_function.bytecode()->setInt16(first_jmp_pos, (int16_t)offset);
+
+        // ... else
+        if(node->elseBlock()) {
+            translated_function.bytecode()->addInsn(BC_JA);
+            uint32_t second_jmp_pos = translated_function.bytecode()->current();
+            translated_function.bytecode()->addInt16(0);
+            node->elseBlock()->visit(this);
+
+            uint32_t after_else_pos = translated_function.bytecode()->current();
+            uint32_t offset2 = after_else_pos - second_jmp_pos;
+            assert(offset2 == (int16_t)offset2);
+
+            translated_function.bytecode()->setInt16(second_jmp_pos, offset2);
+        }
     }
 
     virtual void visitBlockNode(BlockNode* node) {
