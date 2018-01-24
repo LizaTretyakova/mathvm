@@ -151,7 +151,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     }
 
     // returns the position of the jmp's argument, 0 on error
-    uint32_t push_jump() {
+    uint32_t push_cond_jump() {
         if(type_stack.size() < 2) {
             invalidate();
             return 0;
@@ -184,7 +184,22 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         translated_function.bytecode()->addTyped(var_id);
     }
 
-    uint16_t store_scope() {
+    void push_ja(uint32_t to) {
+        translated_function.bytecode()->addInsn(BC_JA);
+        uint32_t from = translated_function.bytecode()->current();
+        uint32_t_t offset = to - from;
+        assert(offset == (int16_t)offset);
+        translated_function.bytecode()->addInt16((int16_t)offset);
+    }
+
+    void update_jmp(uint32_t from) {
+        uint32_t to = translated_function.bytecode()->current();
+        uint32_t offset = to - from;
+        assert(offset == (int16_t)offset);
+        translated_function.bytecode()->setInt16(from, (int16_t)offset);
+    }
+
+    uint16_t store_scope(Scope* scope) {
         if(!scope_map.count(scope)) {
             uint16_t scope_id = (uint16_t)scope_map.size();
             scope_map.insert(scope, scope_id);
@@ -357,10 +372,6 @@ public:
     virtual void visitStoreNode(StoreNode* node) {
         cerr << "[Store]" << endl;
 
-//        pout << node->var()->name() << " "
-//                  << tokenOp(node->op()) << " ";
-//        node->value()->visit(this);
-
         TokenKind op = node->op();
         AstVar* var = node->var();
         Scope* scope = var->owner();
@@ -404,14 +415,6 @@ public:
     virtual void visitForNode(ForNode* node) {
         cerr << "[For]" << endl;
 
-//        pout << "for (" << node->var()->name() << " in ";
-//        node->inExpr()->visit(this);
-//        pout << ") {\n";
-//        node->body()->visit(this);
-//        pout << indent << "}\n";
-//        need_semicolon = false;
-
-
         // get and check the condition
         BinaryOpNode* range = node->inExpr();
         TokenKind op = range->kind();
@@ -440,14 +443,9 @@ public:
 
         uint32_t to_cond_pos = translated_function.bytecode()->current();
 
-        // make while
+        // make condtion
         push_load_i(scope_id, var_id);
-//        translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
-//        translated_function.bytecode()->addTyped(scope_id);
-//        translated_function.bytecode()->addTyped(var_id);
-//        type_stack.push(VT_INT);
 
-        // range --> <
         range->right()->visit(this);
         type = update_type_stack_un();
         if(type != VT_INT) {
@@ -458,57 +456,44 @@ public:
 
         // set jump
         translated_function.bytecode()->addInsn(BC_IFICMPG);
-        uint32_t second_jmp_pos = translated_function.bytecode()->current();
+        uint32_t cond_checked_pos= translated_function.bytecode()->current();
         translated_function.bytecode()->addInt16(0);
 
         // loop body
         node->body()->visit(this);
 
         // set incr
-        translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
-        translated_function.bytecode()->addTyped(scope_id);
-        translated_function.bytecode()->addTyped(var_id);
-        type_stack.push(VT_INT);
+        push_load_i(scope_id, var_id);
+
         translated_function.bytecode()->addInsn(BC_ILOAD1);
         type_stack.push(VT_INT);
+
         translated_function.bytecode()->addInsn(BC_IADD);
         type = update_type_stack();
         assert(type == VT_INT);
-        translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
-        translated_function.bytecode()->addTyped(scope_id);
-        translated_function.bytecode()->addTyped(var_id);
+
+        push_store_i(scope_id, var_id);
 
         // jump
-        translated_function.bytecode()->addInsn(BC_JA);
-        translated_function.bytecode()->addInt16(0);
-        uint32_t first_after_loop_pos = translated_function.bytecode()->current();
-        uint32_t_t offset = to_cond_pos - first_after_loop_pos;
-        assert(offset == (int16_t)offset);
-        translated_function.bytecode()->setInt16(first_after_loop_pos - 1, (int16_t)offset);
+        push_ja(to_cond_pos);
+        update_jmp(cond_checked_pos);
     }
 
     virtual void visitWhileNode(WhileNode* node) {
         cerr << "[While]" << endl;
 
-        uint32_t first_jmp_pos = translated_function.bytecode()->current();
+        uint32_t to_cond_pos = translated_function.bytecode()->current();
 
         node->whileExpr()->visit(this);
         translated_function.bytecode()->addInsn(BC_ILOAD0);
         type_stack.push(VT_INT);
 
-        uint32_t second_jmp_pos = push_jump();
+        uint32_t cond_checked_pos = push_cond_jump();
 
         node->loopBlock()->visit(this);
-        translated_function.bytecode()->addInsn(BC_JA);
-        uint32_t first_after_loop_pos = translated_function.bytecode()->current();
-        uint32_t_t offset = first_jmp_pos - first_after_loop_pos;
-        assert(offset == (int16_t)offset);
-        translated_function.bytecode()->addInt16(offset);
+        push_ja(to_cond_pos);
 
-        uint32_t after_loop = translated_function.bytecode()->current();
-        int16_t offset2 = after_loop - second_jmp_pos;
-        assert(offset2 == (int16_t)offset2);
-        translated_function.bytecode()->setInt16(second_jmp_pos, offset2);
+        update_jmp(cond_checked_pos);
     }
 
     virtual void visitIfNode(IfNode* node) {
@@ -518,7 +503,7 @@ public:
         node->ifExpr()->visit(this);
         translated_function.bytecode()->addInsn(BC_ILOAD0);
         type_stack.push(VT_INT);
-        uint32_t first_jmp_pos = push_jump();
+        uint32_t first_jmp_pos = push_cond_jump();
 
         // ... then ...
         node->thenBlock()->visit(this);
@@ -546,20 +531,21 @@ public:
     virtual void visitBlockNode(BlockNode* node) {
         cerr << "[Block]" << endl;
 
-        indent_size += indent_shift;
-        cerr << "[" << indent_size << " " << node << "]" << endl;
-        create_indent(indent_size);
+        Scope* scope = node->scope();
+        store_scope(scope);
 
         for(Scope::VarIterator it(node->scope()); it.hasNext();) {
             AstVar* var = it.next();
-            pout << indent << typeToName(var->type()) << " "
-                 << var->name() << ";\n";
+            store_var(scope, var);
         }
 
         for(Scope::FunctionIterator it(node->scope()); it.hasNext();) {
             AstFunction* fun = it.next();
+            BytecodeTranslateVisitor funVisitor(this);
             fun->node()->visit(this);
             need_semicolon = true;
+
+            translated_code.addFunction()
         }
 
         for (uint32_t i = 0; i < node->nodes(); i++) {
