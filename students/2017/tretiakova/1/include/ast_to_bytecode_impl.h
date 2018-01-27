@@ -235,8 +235,8 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         return translated_code.add_var(scope, var);
     }
 
-    uint16_t add_var(Scope* scope, string name) {
-        return translated_code.add_var(scope, name);
+    uint16_t add_var(Scope* scope, VarType type, string name) {
+        return translated_code.add_var(scope, type, name);
     }
 
 public:
@@ -601,7 +601,7 @@ public:
             VarType parameterType = node->parameterType(i);
             string parameterName = node->parameterName(i);
 
-            uint16_t var_id = add_var(scope, parameterName);
+            uint16_t var_id = add_var(scope, parameterType, parameterName);
 
             push_store(parameterType, scope_id, var_id);
         }

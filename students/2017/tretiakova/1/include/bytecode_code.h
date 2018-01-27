@@ -15,12 +15,16 @@ class BytecodeCode : public Code {
     typedef map<Scope*, uint16_t> ScopeMap;
     typedef map<string, uint16_t> VarNameMap;
 
-    BytecodeFunction translated_function;
-
     ScopeMap scope_map;
     map<Scope*, VarNameMap> var_map;
-    vector<vector<AstVar*>> var_by_scope;
+
+    BytecodeFunction translated_function;
+    vector<vector<Var>> *var_by_scope;
 public:
+
+    BytecodeCode() = default;
+
+    BytecodeCode(vector<vector<Var>> *v_ptr): BytecodeCode(), var_by_scope(v_ptr) {}
 
     Bytecode* bytecode() {
         return translated_function.bytecode();
@@ -30,8 +34,8 @@ public:
         return &translated_function;
     }
 
-    vector<vector<AstVar*> > get_var_by_scope() {
-        return var_by_scope;
+    vector<vector<Var> > get_var_by_scope() {
+        return *var_by_scope;
     }
 
     void set_clear() {
@@ -49,21 +53,21 @@ public:
         return scope_map[scope];
     }
 
-    uint16_t add_var(Scope* scope, string name) {
+    uint16_t add_var(Scope* scope, VarType type, string name) {
         uint16_t scope_id = add_scope();
         VarNameMap smap = var_map[scope];
 
         if(!smap.count(name)) {
             uint16_t var_id = smap.size();
             smap.insert(name, var_id);
-            var_by_scope[scope_id].push_back(var);
+            var_by_scope[scope_id].emplace_back(type, name);
             return var_id;
         }
         return smap[name];
     }
 
     uint16_t add_var(Scope* scope, AstVar* var) {
-        return add_var(scope, var->name());
+        return add_var(scope, var->type(), var->name());
     }
 
     uint16_t fun_id_by_name(string name) {
@@ -81,6 +85,8 @@ public:
         }
         return (*it).second;
     }
+
+    virtual
 };
 
 }
