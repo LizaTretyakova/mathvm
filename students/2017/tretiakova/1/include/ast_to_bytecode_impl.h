@@ -30,7 +30,8 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 //    typedef map<string, uint16_t> VarNameMap;
 
 //    BytecodeFunction translated_function;
-    BytecodeCode translated_code;
+    BytecodeCode* translated_code;
+    BytecodeFunction translated_function;
     // The default value. It's here due to invariant that
     // *** visitor visits one function at a time ***
     VarType return_type = VT_VOID;
@@ -167,10 +168,10 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             break;
         }
 
+        translated_function.bytecode()->addTyped(scope_id);
+        translated_function.bytecode()->addTyped(var_id);
 //        translated_function.bytecode()->addTyped(scope_id);
 //        translated_function.bytecode()->addTyped(var_id);
-        translated_code.bytecode()->addTyped(scope_id);
-        translated_code.bytecode()->addTyped(var_id);
 
         return;
     }
@@ -228,15 +229,15 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     }
 
     uint16_t add_scope(Scope* scope) {
-        return translated_code.add_scope(scope);
+        return translated_code->add_scope(scope);
     }
 
     uint16_t add_var(Scope* scope, AstVar* var) {
-        return translated_code.add_var(scope, var);
+        return translated_code->add_var(scope, var);
     }
 
     uint16_t add_var(Scope* scope, VarType type, string name) {
-        return translated_code.add_var(scope, type, name);
+        return translated_code->add_var(scope, type, name);
     }
 
 public:
@@ -251,11 +252,13 @@ public:
     }
 
     void clear_code() {
-        translated_code.set_clear();
+        translated_code->set_clear();
     }
 
-    BytecodeFunction* program() {
-        return translated_code.get_translated_function();
+    BytecodeFunction* allocate_function_copy() {
+//        return translated_code->get_translated_function();
+        BytecodeFunction* function_copy = new BytecodeFunction(translated_function);
+        return function_copy;
     }
 
     virtual void visitBinaryOpNode(BinaryOpNode* node) {
@@ -360,7 +363,7 @@ public:
     virtual void visitStringLiteralNode(StringLiteralNode* node) {
         cerr << "[StringLiteral]" << endl;
 
-        uint16_t const_id = translated_code.makeStringConstant(node->literal());
+        uint16_t const_id = translated_code->makeStringConstant(node->literal());
         translated_function.bytecode()->addInsn(BC_SLOAD);
         translated_function.bytecode()->addTyped(const_id);
     }
@@ -583,7 +586,7 @@ public:
             BytecodeTranslateVisitor funVisitor(this, fun->node()->returnType());
             fun->node()->visit(funVisitor);
 
-            translated_code.addFunction(funVisitor.program());
+            translated_code->addFunction(funVisitor.allocate_function_copy());
         }
 
         for (uint32_t i = 0; i < node->nodes(); i++) {
@@ -628,13 +631,13 @@ public:
                 return;
             }
         }
-        translated_code.bytecode()->addInsn(BC_RETURN);
+        translated_function.bytecode()->addInsn(BC_RETURN);
     }
 
     virtual void visitCallNode(CallNode* node) {
         cerr << "[Call]" << endl;
 
-        TranslatedFunction fun = translated_code.functionByName(node->name());
+        TranslatedFunction fun = translated_code->functionByName(node->name());
 
         if(node->parametersNumber() != fun.parametersNumber()) {
             cerr << "Parameters number mismatch at function " << node->name()
@@ -659,8 +662,8 @@ public:
             }
         }
 
-        translated_code.bytecode()->addInsn(BC_CALL);
-        translated_code.bytecode()->addTyped(fun.id());
+        translated_function.bytecode()->addInsn(BC_CALL);
+        translated_function.bytecode()->addTyped(fun.id());
     }
 
     virtual void visitNativeCallNode(NativeCallNode* node) {
@@ -678,10 +681,10 @@ public:
         }
 
         uint16_t nat_id =
-                translated_code.makeNativeFunction(node->nativeName(), node->nativeSignature(), function_handler);
+                translated_code->makeNativeFunction(node->nativeName(), node->nativeSignature(), function_handler);
 
-        translated_code.bytecode()->addInsn(BC_CALLNATIVE);
-        translated_code.bytecode()->addTyped(nat_id);
+        translated_function.bytecode()->addInsn(BC_CALLNATIVE);
+        translated_function.bytecode()->addTyped(nat_id);
     }
 
     virtual void visitPrintNode(PrintNode* node) {
@@ -694,13 +697,13 @@ public:
             operand_type = update_type_stack_un();
             switch (operand_type) {
             case VT_INT:
-                translated_code.bytecode()->addInsn(BC_IPRINT);
+                translated_function.bytecode()->addInsn(BC_IPRINT);
                 break;
             case VT_DOUBLE:
-                translated_code.bytecode()->addInsn(BC_DPRINT);
+                translated_function.bytecode()->addInsn(BC_DPRINT);
                 break;
             case VT_STRING:
-                translated_code.bytecode()->addInsn(BC_SPRINT);
+                translated_function.bytecode()->addInsn(BC_SPRINT);
                 break;
             default:
                 cerr << "Invalid operand type for print: " << typeToName(operand_type)
