@@ -5,6 +5,8 @@
 #include "../include/mathvm.h"
 #include "../include/visitors.h"
 
+#include "bytecode_code.h"
+
 #include <vector>
 #include <stack>
 #include <map>
@@ -21,15 +23,15 @@ typedef union {
 } Value;
 
 class BytecodeTranslateVisitor : public AstBaseVisitor {
-    typedef map<Scope*, uint16_t> ScopeMap;
-    typedef map<string, uint16_t> VarNameMap;
+//    typedef map<Scope*, uint16_t> ScopeMap;
+//    typedef map<string, uint16_t> VarNameMap;
 
-    BytecodeFunction translated_function;
-    Code translated_code;
+//    BytecodeFunction translated_function;
+    BytecodeCode translated_code;
     stack<VarType> type_stack;
-    ScopeMap scope_map;
-    map<Scope*, VarNameMap> var_map;
-    vector<vector<AstVar*>> var_by_scope;
+//    ScopeMap scope_map;
+//    map<Scope*, VarNameMap> var_map;
+//    vector<vector<AstVar*>> var_by_scope;
 
     VarType update_type_stack_un() { // check
         if(type_stack.size() < 1) {
@@ -127,7 +129,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         translated_function.bytecode()->addInsn(bc);
     }
 
-    void push_store(VarType type) {
+    void push_store(VarType type, uint16_t scope_id, uint16_t var_id) {
         VarType last_type = update_type_stack_un();
         if(last_type != type) {
             invalidate();
@@ -147,6 +149,12 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             invalidate();
             break;
         }
+
+//        translated_function.bytecode()->addTyped(scope_id);
+//        translated_function.bytecode()->addTyped(var_id);
+        translated_code.bytecode()->addTyped(scope_id);
+        translated_code.bytecode()->addTyped(var_id);
+
         return;
     }
 
@@ -199,37 +207,28 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         translated_function.bytecode()->setInt16(from, (int16_t)offset);
     }
 
-    uint16_t store_scope(Scope* scope) {
-        if(!scope_map.count(scope)) {
-            uint16_t scope_id = (uint16_t)scope_map.size();
-            scope_map.insert(scope, scope_id);
-            var_map.insert(scope, VarNameMap());
-            var_by_scope.push_back(vector<AstVar*>());
-            return scope_id;
-        }
-        return scope_map[scope];
+    uint16_t add_scope(Scope* scope) {
+        return translated_code.add_scope(scope);
     }
 
-    uint16_t store_var(Scope* scope, AstVar* var) {
-        string name = var->name();
-        uint16_t scope_id = store_scope();
-        VarNameMap smap = var_map[scope];
+    uint16_t add_var(Scope* scope, AstVar* var) {
+        return translated_code.add_var(scope, var);
+    }
 
-        if(!smap.count(name)) {
-            uint16_t var_id = smap.size();
-            smap.insert(name, var_id);
-            var_by_scope[scope_id].push_back(var);
-            return var_id;
-        }
-        return smap[name];
+    uint16_t add_var(Scope* scope, string name) {
+        return translated_code.add_var(scope, name);
     }
 
 public:
 
     BytecodeTranslateVisitor() {}
 
-    Bytecode program() {
-        return bytecode;
+    void clear_code() {
+        translated_code.set_clear();
+    }
+
+    BytecodeFunction* program() {
+        return translated_code.get_translated_function();
     }
 
     virtual void visitBinaryOpNode(BinaryOpNode* node) {
@@ -346,8 +345,8 @@ public:
 
         const AstVar* var = node->var();
         Scope* scope = var->owner();
-        uint16_t scope_id = store_scope(scope);
-        uint16_t var_id = store_var(scope, var);
+        uint16_t scope_id = add_scope(scope);
+        uint16_t var_id = add_var(scope, var);
 
         VarType type = var->type();
         switch(type) {
@@ -377,8 +376,8 @@ public:
         Scope* scope = var->owner();
         VarType type = var->type();
 
-        uint16_t scope_id = store_scope(scope);
-        uint16_t var_id = store_var(scope, var);
+        uint16_t scope_id = add_scope(scope);
+        uint16_t var_id = add_var(scope, var);
 
         if(op == tINCRSET || op == tDECRSET) {
             switch(type) {
@@ -407,9 +406,9 @@ public:
             push_numeric(type, BC_ISUB, BC_DSUB);
         }
 
-        push_store(type);
-        translated_function.bytecode()->addTyped(scope_id);
-        translated_function.bytecode()->addTyped(var_id);
+        push_store(type, scope_id, var_id);
+//        translated_function.bytecode()->addTyped(scope_id);
+//        translated_function.bytecode()->addTyped(var_id);
     }
 
     virtual void visitForNode(ForNode* node) {
@@ -430,8 +429,8 @@ public:
         // load to var
         const AstVar* var = node->var();
         Scope* scope = var->owner();
-        uint16_t scope_id = store_scope(scope);
-        uint16_t var_id = store_var(scope, var);
+        uint16_t scope_id = add_scope(scope);
+        uint16_t var_id = add_var(scope, var);
 
         VarType type = var->type();
         if(type != VT_INT) {
@@ -531,58 +530,43 @@ public:
     virtual void visitBlockNode(BlockNode* node) {
         cerr << "[Block]" << endl;
 
-        Scope* scope = node->scope();
-        store_scope(scope);
-
-        for(Scope::VarIterator it(node->scope()); it.hasNext();) {
-            AstVar* var = it.next();
-            store_var(scope, var);
-        }
+//        for(Scope::VarIterator it(node->scope()); it.hasNext();) {
+//            AstVar* var = it.next();
+//            store_var(scope, var);
+//        }
 
         for(Scope::FunctionIterator it(node->scope()); it.hasNext();) {
             AstFunction* fun = it.next();
             BytecodeTranslateVisitor funVisitor(this);
-            fun->node()->visit(this);
-            need_semicolon = true;
+            funVisitor.clear_code();
+            fun->node()->visit(funVisitor);
 
-            translated_code.addFunction()
+            translated_code.addFunction(funVisitor.program());
         }
 
         for (uint32_t i = 0; i < node->nodes(); i++) {
-            pout << indent;
-
             node->nodeAt(i)->visit(this);
-            if(need_semicolon) {
-                pout << ";\n";
-            } else {
-                need_semicolon = true;
-            }
         }
-
-        indent_size -= indent_shift;
-        create_indent(indent_size);
-        cerr << "[/" << indent_size << " " << node << "]" << endl;
     }
 
     virtual void visitFunctionNode(FunctionNode* node) {
         cerr << "[Function]" << node->name() << endl;
 
-        pout << "function " << typeToName(node->returnType())
-             << " " << node->name() << "(";
-        for(uint32_t i = 0; i < node->parametersNumber(); i++) {
-            if(i > 0) {
-                pout << ", ";
-            }
+//        node->returnType()
 
-            string parameterType =
-                    string(typeToName(node->parameterType(i)));
+        Scope* scope = node->body()->scope();
+        uint16_t scope_id = add_scope(scope);
+
+        for(uint32_t i = 0; i < node->parametersNumber(); i++) {
+            VarType parameterType = node->parameterType(i);
             string parameterName = node->parameterName(i);
-            pout << parameterType << " " << parameterName;
+
+            uint16_t var_id = add_var(scope, parameterName);
+
+            push_store(parameterType, scope_id, var_id);
         }
-        pout << ") {\n";
+
         node->body()->visit(this);
-        pout << create_indent(indent_size - indent_shift) << "}\n";
-        need_semicolon = false;
     }
 
     virtual void visitReturnNode(ReturnNode* node) {
