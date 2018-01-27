@@ -65,6 +65,22 @@ public:
     uint16_t add_var(Scope* scope, AstVar* var) {
         return add_var(scope, var->name());
     }
+
+    uint16_t fun_id_by_name(string name) {
+        FunctionMap::const_iterator it = _functionById.find(name);
+        if (it == _functionById.end()) {
+            return 0;
+        }
+        return (*it).second;
+    }
+
+    uint16_t native_id_by_name(string name) {
+        NativeMap::const_iterator it = _nativeById.find(name);
+        if (it == _nativeById.end()) {
+            return 0;
+        }
+        return (*it).second;
+    }
 };
 
 }

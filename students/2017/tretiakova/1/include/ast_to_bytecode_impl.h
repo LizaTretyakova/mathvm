@@ -11,6 +11,7 @@
 #include <stack>
 #include <map>
 #include <string>
+#include <dlfcn.h>
 
 namespace mathvm {
 
@@ -22,12 +23,17 @@ typedef union {
     const char* _stringValue;
 } Value;
 
+typedef void* (*dl_fun_ptr)();
+
 class BytecodeTranslateVisitor : public AstBaseVisitor {
 //    typedef map<Scope*, uint16_t> ScopeMap;
 //    typedef map<string, uint16_t> VarNameMap;
 
 //    BytecodeFunction translated_function;
     BytecodeCode translated_code;
+    // The default value. It's here due to invariant that
+    // *** visitor visits one function at a time ***
+    VarType return_type = VT_VOID;
     stack<VarType> type_stack;
 //    ScopeMap scope_map;
 //    map<Scope*, VarNameMap> var_map;
@@ -88,6 +94,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void invalidate() {
         type_stack.pop();
         type_stack.push(VT_INVALID);
+        assert(false);
     }
 
     void push_numeric(VarType type, Instruction i_bc, Instruction d_bc) {
@@ -99,6 +106,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             translated_function.bytecode()->addInsn(d_bc);
             break;
         default:
+            cerr << "Invalid operand type in numeric op" << endl;
             invalidate();
             break;
         }
@@ -116,6 +124,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             translated_function.bytecode()->addInsn(s_bc);
             break;
         default:
+            cerr << "Invalid type in comparison" << endl;
             invalidate();
             break;
         }
@@ -123,6 +132,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 
     void push_logic(VarType type, Instruction bc) {
         if(type != VT_INT) {
+            cerr << "Non-int type in logic" << endl;
             invalidate();
             break;
         }
@@ -132,9 +142,15 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void push_store(VarType type, uint16_t scope_id, uint16_t var_id) {
         VarType last_type = update_type_stack_un();
         if(last_type != type) {
+            cerr << "Type mismatch in STORE, expected " << typeToName(last_type)
+                 << ", got " << typeToName(type) << endl;
             invalidate();
             return;
         }
+
+        // because STORE will take one value from stack
+        type_stack.pop();
+
         switch(type) {
         case VT_INT:
             translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
@@ -146,6 +162,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             translated_function.bytecode()->addInsn(BC_STORECTXSVAR);
             break;
         default:
+            cerr << "Unexpected type " << typeToName(type) << " in STORE" << endl;
             invalidate();
             break;
         }
@@ -161,6 +178,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     // returns the position of the jmp's argument, 0 on error
     uint32_t push_cond_jump() {
         if(type_stack.size() < 2) {
+            cerr << "Too few entries on stack (<2)" << endl;
             invalidate();
             return 0;
         }
@@ -175,6 +193,8 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             return index;
         }
 
+        cerr << "Non-int operands (" << typeToName(type_zero)
+             << ", " << typeToName(type_expr) << ") in CMP JUMP" << endl;
         invalidate();
         return 0;
     }
@@ -186,11 +206,11 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         type_stack.push(VT_INT);
     }
 
-    void push_store_i(uint16_t scope_id, uint16_t var_id) {
-        translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
-        translated_function.bytecode()->addTyped(scope_id);
-        translated_function.bytecode()->addTyped(var_id);
-    }
+//    void push_store_i(uint16_t scope_id, uint16_t var_id) {
+//        translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
+//        translated_function.bytecode()->addTyped(scope_id);
+//        translated_function.bytecode()->addTyped(var_id);
+//    }
 
     void push_ja(uint32_t to) {
         translated_function.bytecode()->addInsn(BC_JA);
@@ -223,6 +243,13 @@ public:
 
     BytecodeTranslateVisitor() {}
 
+    BytecodeTranslateVisitor(const BytecodeTranslateVisitor& b) = default;
+
+    BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, VarType t):
+        BytecodeTranslateVisitor(b), return_type(t) {
+        clear_code();
+    }
+
     void clear_code() {
         translated_code.set_clear();
     }
@@ -239,6 +266,9 @@ public:
 
         VarType type = update_type_stack();
         if(type == VT_INVALID || type == VT_VOID) {
+            cerr << "Invalid type before BinaryOp, type "
+                 << typeToName(type)
+                 << ", position " << node->position() << endl;
             invalidate();
             return; // TODO: signal somehow else?
         }
@@ -284,6 +314,9 @@ public:
                 bytecode.add(BC_MOD);
                 break;
             }
+        default:
+            cerr << "Unknown token op " << string(tokenOp(node->kind()))
+                 << " at position " << node->position() << endl;
             invalidate();
             break;
         }
@@ -296,6 +329,7 @@ public:
 
         VarType type = update_type_stack_un();
         if(type == VT_INVALID || type == VT_VOID || type == VT_STRING) {
+            cerr << "Invalid operand type, position " << node->position() << endl;
             invalidate();
             return;
         }
@@ -303,6 +337,9 @@ public:
         switch(node->kind()) {
         case tNOT:
             if(type != VT_INT) {
+                cerr << "Non-int operand in tNOT, type "
+                     << typeToName(type)
+                     << ", position " << node->position() << endl;
                 invalidate();
                 break;
             }
@@ -313,6 +350,8 @@ public:
             push_numeric(type, BC_INEG, BC_DNEG);
             break;
         default:
+            cerr << "Unknown unary op " << tokenOp(node->kind())
+                 << ", position " << node->position() << endl;
             invalidate();
             break;
         }
@@ -360,6 +399,8 @@ public:
             translated_function.bytecode()->addInsn(BC_LOADCTXSVAR);
             break;
         default:
+            cerr << "Invalid LOAD type " << typeToName(type)
+                 << ", position " << node->position() << endl;
             invalidate();
             break;
         }
@@ -390,6 +431,8 @@ public:
                 type_stack.push(VT_DOUBLE);
                 break;
             default:
+                cerr << "Unknown STORE op " << tokenOp(node->kind())
+                     << ", position " << node->position() << endl;
                 invalidate();
                 break;
             }
@@ -418,7 +461,7 @@ public:
         BinaryOpNode* range = node->inExpr();
         TokenKind op = range->kind();
         if(op != tRANGE) {
-            cerr << "non-range op in for" << std::endl;
+            cerr << "non-range op in for, position " << node->position() << std::endl;
             invalidate();
             return;
         }
@@ -434,11 +477,11 @@ public:
 
         VarType type = var->type();
         if(type != VT_INT) {
-            cerr << "non-int iterator in for" << endl;
+            cerr << "non-int iterator in for, position " << node->position() << endl;
             invalidate();
             return;
         }
-        push_store_i(scope_id, var_id);
+        push_store(type, scope_id, var_id);
 
         uint32_t to_cond_pos = translated_function.bytecode()->current();
 
@@ -448,7 +491,7 @@ public:
         range->right()->visit(this);
         type = update_type_stack_un();
         if(type != VT_INT) {
-            cerr << "non-int cond in for" << endl;
+            cerr << "non-int cond in for, position " << node->position() << endl;
             invalidate();
             return;
         }
@@ -471,7 +514,7 @@ public:
         type = update_type_stack();
         assert(type == VT_INT);
 
-        push_store_i(scope_id, var_id);
+        push_store(type, scope_id, var_id);
 
         // jump
         push_ja(to_cond_pos);
@@ -537,8 +580,7 @@ public:
 
         for(Scope::FunctionIterator it(node->scope()); it.hasNext();) {
             AstFunction* fun = it.next();
-            BytecodeTranslateVisitor funVisitor(this);
-            funVisitor.clear_code();
+            BytecodeTranslateVisitor funVisitor(this, fun->node()->returnType());
             fun->node()->visit(funVisitor);
 
             translated_code.addFunction(funVisitor.program());
@@ -551,8 +593,6 @@ public:
 
     virtual void visitFunctionNode(FunctionNode* node) {
         cerr << "[Function]" << node->name() << endl;
-
-//        node->returnType()
 
         Scope* scope = node->body()->scope();
         uint16_t scope_id = add_scope(scope);
@@ -574,43 +614,101 @@ public:
 
         pout << "return ";
         AstNode* return_expr = node->returnExpr();
-        if(return_expr == NULL) {
-            pout << "void";
-        } else {
+        if(return_expr) {
             return_expr->visit(this);
+
+            // check for the correct return type
+            VarType return_expr_type = update_type_stack_un();
+            if(return_expr_type != return_type) {
+                cerr << "Invalid return type; expected "
+                     << typeToName(return_type) << ", got"
+                     << typeToName(return_type_expr)
+                     << ", position " << node->position() << endl;
+                invalidate();
+                return;
+            }
         }
+        translated_code.bytecode()->addInsn(BC_RETURN);
     }
 
     virtual void visitCallNode(CallNode* node) {
         cerr << "[Call]" << endl;
 
-        pout << node->name() << "(";
-        for(uint32_t i = 0; i < node->parametersNumber(); i++) {
-            if(i > 0) {
-                pout << ", ";
-            }
-            node->parameterAt(i)->visit(this);
+        TranslatedFunction fun = translated_code.functionByName(node->name());
+
+        if(node->parametersNumber() != fun.parametersNumber()) {
+            cerr << "Parameters number mismatch at function " << node->name()
+                 << " at position " << node->position();
+            invalidate();
+            return;
         }
-        pout << ")";
+
+        VarType param_type, stack_type;
+        for(uint32_t i = 0; i < node->parametersNumber(); i++) {
+            node->parameterAt(i)->visit(this);
+
+            param_type = fun.parameterType(i);
+            stack_type = update_type_stack_un();
+            if(param_type != stack_type) {
+                cerr << "Parameter type mismatch, expected "
+                     << typeToName(param_type) << ", got "
+                     << typeToName(stack_type) << ", position"
+                     << node->position() << endl;
+                invalidate();
+                return;
+            }
+        }
+
+        translated_code.bytecode()->addInsn(BC_CALL);
+        translated_code.bytecode()->addTyped(fun.id());
     }
 
     virtual void visitNativeCallNode(NativeCallNode* node) {
         cerr << "[NativeCall]" << endl;
 
-        pout << "native '" << node->nativeName() << "'";
+        dl_fun_ptr function_handler;
+        void* handle = dlopen(0,RTLD_NOW|RTLD_GLOBAL);
+        *(void**)(&function_handler) = dlsym(handle, node->nativeName().c_str());
+
+        if(!function_handler) {
+            cerr << "Failed to load native function " << node->nativeName()
+                 << ", position " << node->position();
+            invalidate();
+            return;
+        }
+
+        uint16_t nat_id =
+                translated_code.makeNativeFunction(node->nativeName(), node->nativeSignature(), function_handler);
+
+        translated_code.bytecode()->addInsn(BC_CALLNATIVE);
+        translated_code.bytecode()->addTyped(nat_id);
     }
 
     virtual void visitPrintNode(PrintNode* node) {
         cerr << "[Print]" << endl;
 
-        pout << "print(";
+        VarType operand_type;
         for(uint32_t i = 0; i < node->operands(); i++) {
-            if(i > 0) {
-                pout << ", ";
-            }
             node->operandAt(i)->visit(this);
+
+            operand_type = update_type_stack_un();
+            switch (operand_type) {
+            case VT_INT:
+                translated_code.bytecode()->addInsn(BC_IPRINT);
+                break;
+            case VT_DOUBLE:
+                translated_code.bytecode()->addInsn(BC_DPRINT);
+                break;
+            case VT_STRING:
+                translated_code.bytecode()->addInsn(BC_SPRINT);
+                break;
+            default:
+                cerr << "Invalid operand type for print: " << typeToName(operand_type)
+                     << ", position " << node->position() << endl;
+                invalidate();
+                break;
+            }
         }
-        pout << ")";
     }
 };
 
