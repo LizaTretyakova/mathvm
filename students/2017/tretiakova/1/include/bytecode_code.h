@@ -384,23 +384,78 @@ public:
                 break;
 
             case BC_LOADCTXDVAR:
+                int16_t scope_id = cur->getTyped(i + 1);
+                int16_t var_id = cur->getTyped(i + 1 + 2);
+                value_stack.emplace((*var_by_scope)[scope_id][var_id].getDoubleValue());
+                i += 1 + 2 + 2;
                 break;
+
             case BC_LOADCTXIVAR:
+                int16_t scope_id = cur->getTyped(i + 1);
+                int16_t var_id = cur->getTyped(i + 1 + 2);
+                value_stack.emplace((*var_by_scope)[scope_id][var_id].getIntValue());
+                i += 1 + 2 + 2;
                 break;
+
             case BC_LOADCTXSVAR:
+                int16_t scope_id = cur->getTyped(i + 1);
+                int16_t var_id = cur->getTyped(i + 1 + 2);
+                value_stack.emplace((*var_by_scope)[scope_id][var_id].getStringValue);
+                i += 1 + 2 + 2;
                 break;
+
             case BC_STORECTXDVAR:
+                int16_t scope_id = cur->getTyped(i + 1);
+                int16_t var_id = cur->getTyped(i + 1 + 2);
+                t = value_stack.top();
+                value_stack.pop();
+                (*var_by_scope)[scope_id][var_id].setDoubleValue(t._doubleValue);
+                i += 1 + 2 + 2;
                 break;
+
             case BC_STORECTXIVAR:
+                int16_t scope_id = cur->getTyped(i + 1);
+                int16_t var_id = cur->getTyped(i + 1 + 2);
+                t = value_stack.top();
+                value_stack.pop();
+                (*var_by_scope)[scope_id][var_id].setIntValue(t._intValue);
+                i += 1 + 2 + 2;
                 break;
+
             case BC_STORECTXSVAR:
+                int16_t scope_id = cur->getTyped(i + 1);
+                int16_t var_id = cur->getTyped(i + 1 + 2);
+                t = value_stack.top();
+                value_stack.pop();
+                (*var_by_scope)[scope_id][var_id].setStringValue(t._stringValue);
+                i += 1 + 2 + 2;
                 break;
+
             case BC_CALL:
+                uint16_t fun_id = cur->getUInt16(i + 1);
+                BytecodeFunction* f = (BytecodeFunction*)functionById(fun_id);
+                call_stack.push_back(f->bytecode());
+                int stack_size = value_stack.size();
+                call(call_stack.size() - 1);
+                int diff = value_stack.size() - stack_size;
+                if(diff != 0 && diff != 1) {
+                    cerr << "Suspicious value stack size (d "
+                         << diff << ") after function call " << fun_id << endl;
+                }
+                call_stack.pop_back();
+                i += (sizeof(Instruction) + sizeof(uint16_t)) / sizeof(uint8_t);
                 break;
+
             case BC_CALLNATIVE:
+                uint16_t nat_id = cur->getUInt16(i + 1);
+                Signature* signature;
+                string* name;
+                void* handler = nativeById(nat_id, &signature, &name);
+                i += (sizeof(Instruction) + sizeof(uint16_t)) / sizeof(uint8_t);
                 break;
+
             case BC_RETURN:
-                break;
+                return;
             default:
                 cerr << "Unknown bytecode " << string(bytecodeName(insn))
                      << "at the position " << i << endl;
