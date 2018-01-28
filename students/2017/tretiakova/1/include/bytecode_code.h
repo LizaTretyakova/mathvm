@@ -93,7 +93,7 @@ public:
 
     /***/
 
-    void setVar(Var* to, Var* from) {
+    void set_var(Var* to, Var* from) {
         switch(from->type()) {
         case VT_INT:
             to->setIntValue(from->getIntValue());
@@ -110,7 +110,7 @@ public:
         }
     }
 
-    void call(int call_id) {
+    Status* call(int call_id) {
         Bytecode* cur = call_stack[call_id];
         uint32_t len = cur->length();
         uint32_t i = 0;
@@ -429,11 +429,14 @@ public:
                 BytecodeFunction* f = (BytecodeFunction*)functionById(fun_id);
                 call_stack.push_back(f->bytecode());
                 int stack_size = value_stack.size();
-                call(call_stack.size() - 1);
+                if(call(call_stack.size() - 1)->isError()) {
+                    return Status::Error();
+                }
                 int diff = value_stack.size() - stack_size;
                 if(diff != 0 && diff != 1) {
                     cerr << "Suspicious value stack size (d "
                          << diff << ") after function call " << fun_id << endl;
+                    return Status::Error();
                 }
                 call_stack.pop_back();
                 i += (sizeof(Instruction) + sizeof(uint16_t)) / sizeof(uint8_t);
@@ -448,10 +451,11 @@ public:
                 break;
 
             case BC_RETURN:
-                return;
+                return Status::Ok();
             default:
-                cerr << "Unknown bytecode " << string(bytecodeName(insn))
+                cerr << "Unexpected bytecode " << string(bytecodeName(insn))
                      << "at the position " << i << endl;
+                return Status::Error();
             }
         }
     }
@@ -461,14 +465,15 @@ public:
         Scope* top_scope = scopes[top_scope_id];
         for(Var* var: vars) {
             if(var_map[top_scope].count(var->name())) {
-                setVar(&(*var_by_scope)[top_scope_id][var->name()], var);
+                set_var(&(*var_by_scope)[top_scope_id][var->name()], var);
             } else {
                 cerr << "Unknown global var; type " << typeToName(var->type())
                      << ", name " << var->name() << endl;
             }
         }
         call_stack.push_back(translated_function->bytecode());
-        call(0);
+        Status* status = call(0);
+        return status;
     }
 
     /*
