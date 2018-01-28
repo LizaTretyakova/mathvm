@@ -25,7 +25,7 @@ class BytecodeCode : public Code {
     vector<Scope*> socpes;
     map<Scope*, VarNameMap> var_map;
 
-    BytecodeFunction translated_function;
+    BytecodeFunction* translated_function;
     vector<vector<Var>> *var_by_scope;
 
     vector<uint16_t> scope_stack;
@@ -35,22 +35,15 @@ public:
 
     BytecodeCode() = default;
 
-    BytecodeCode(vector<vector<Var>> *v_ptr): BytecodeCode(), var_by_scope(v_ptr) {}
+    BytecodeCode(BytecodeFunction* bf, vector<vector<Var>> *v_ptr):
+        BytecodeCode(), translated_function(bf), var_by_scope(v_ptr) {}
 
-    Bytecode* bytecode() {
-        return translated_function.bytecode();
-    }
-
-    BytecodeFunction* get_translated_function() {
-        return &translated_function;
+    void set_translated_function(BytecodeFunction* bf) {
+        translated_function = bf;
     }
 
     vector<vector<Var> > get_var_by_scope() {
         return *var_by_scope;
-    }
-
-    void set_clear() {
-        translated_function = BytecodeFunction();
     }
 
     uint16_t add_scope(Scope* scope) {
@@ -474,7 +467,7 @@ public:
                      << ", name " << var->name() << endl;
             }
         }
-        call_stack.push_back(translated_function.bytecode());
+        call_stack.push_back(translated_function->bytecode());
         call(0);
     }
 

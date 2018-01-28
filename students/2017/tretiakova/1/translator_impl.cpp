@@ -3,6 +3,7 @@
 #include "../../../../include/visitors.h"
 
 #include "include/ast_printer_impl.h"
+#include "include/ast_to_bytecode_impl.h"
 
 #include <iostream>
 
@@ -51,15 +52,9 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     }
 
     AstFunction* top = parser->top();
-    //    AstPrinter* visitor = new AstPrinter();
-    top->visit(visitor);
-//    FunctionNode* ast = top->node();
-//    BlockNode* body = ast->body();
-//    AstPrinter* visitor = new AstPrinter();
-//    body->visit(visitor);
-    // std::cout << "was: " << endl << program << endl;
-    // std::cout << "became: " << endl << visitor->program() << endl;
-//    std::cout << visitor->program() << endl;
+    BytecodeTranslateVisitor visitor;
+    top->node()->visit(&visitor);
+    status = visitor.get_status();
     return Status::Ok();
 }
 

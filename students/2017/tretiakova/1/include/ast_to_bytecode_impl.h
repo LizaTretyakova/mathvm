@@ -20,19 +20,26 @@ using namespace std;
 typedef void* (*dl_fun_ptr)();
 
 class BytecodeTranslateVisitor : public AstBaseVisitor {
-//    typedef map<Scope*, uint16_t> ScopeMap;
-//    typedef map<string, uint16_t> VarNameMap;
-
-//    BytecodeFunction translated_function;
     BytecodeCode* translated_code;
-    BytecodeFunction translated_function;
+    BytecodeFunction* translated_function;
     // The default value. It's here due to invariant that
     // *** visitor visits one function at a time ***
     VarType return_type = VT_VOID;
     stack<VarType> type_stack;
-//    ScopeMap scope_map;
-//    map<Scope*, VarNameMap> var_map;
-//    vector<vector<AstVar*>> var_by_scope;
+    Status* status = Status::Ok();
+
+    void invalidate() {
+//        type_stack.pop();
+        type_stack.push(VT_INVALID);
+//        assert(false);
+        status = Status::Error();
+    }
+
+    Status* get_status() {
+        return status;
+    }
+
+    BytecodeCode*
 
     VarType update_type_stack_un() { // check
         if(type_stack.size() < 1) {
@@ -44,7 +51,6 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 
     VarType update_type_stack() {
         if(type_stack.size() < 2) {
-            // TODO: signal the error somehow =/
             type_stack.push(VT_INVALID);
             return;
         }
@@ -54,23 +60,6 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         VarType result;
 
         switch(t_left) {
-//        case VT_STRING:
-//            if(t_right == VT_STRING) {
-//                result = VT_STRING;
-//            } else {
-//                result = VT_INVALID;
-//            }
-//            break;
-//        case VT_DOUBLE:
-//        case VT_INT:
-//            if(t_right == VT_DOUBLE) {
-//                result = VT_DOUBLE;
-//            } else if(t_right == VT_INT) {
-//                result = t_left;
-//            } else {
-//                result = VT_INVALID;
-//            }
-//            break;
         case VT_DOUBLE:
         case VT_INT:
         case VT_STRING:
@@ -86,19 +75,13 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         return result;
     }
 
-    void invalidate() {
-        type_stack.pop();
-        type_stack.push(VT_INVALID);
-        assert(false);
-    }
-
     void push_numeric(VarType type, Instruction i_bc, Instruction d_bc) {
         switch(type) {
         case VT_INT:
-            translated_function.bytecode()->addInsn(i_bc);
+            translated_function->bytecode()->addInsn(i_bc);
             break;
         case VT_DOUBLE:
-            translated_function.bytecode()->addInsn(d_bc);
+            translated_function->bytecode()->addInsn(d_bc);
             break;
         default:
             cerr << "Invalid operand type in numeric op" << endl;
@@ -110,13 +93,13 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void push_comparison(VarType type, Instruction i_bc, Instruction d_bc, Instruction s_bc) {
         switch(type) {
         case VT_INT:
-            translated_function.bytecode()->addInsn(i_bc);
+            translated_function->bytecode()->addInsn(i_bc);
             break;
         case VT_DOUBLE:
-            translated_function.bytecode()->addInsn(d_bc);
+            translated_function->bytecode()->addInsn(d_bc);
             break;
         case VT_STRING:
-            translated_function.bytecode()->addInsn(s_bc);
+            translated_function->bytecode()->addInsn(s_bc);
             break;
         default:
             cerr << "Invalid type in comparison" << endl;
@@ -127,13 +110,13 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 
     void push_condition(Instruction comp_insn) {
         push_comparison(type, BC_ICMP, BC_DCMP, BC_ICMP);
-        translated_function.bytecode()->addInsn(BC_ILOAD0);
+        translated_function->bytecode()->addInsn(BC_ILOAD0);
         push_comparison(VT_INT, comp_insn, comp_insn, comp_insn);
-        translated_function.bytecode()->addTyped(2 + 2);
-        translated_function.bytecode()->addInsn(BC_ILOAD0);
-        translated_function.bytecode()->addInsn(BC_JA);
-        translated_function.bytecode()->addTyped(1);
-        translated_function.bytecode()->addInsn(BC_ILOAD1);
+        translated_function->bytecode()->addTyped(2 + 2);
+        translated_function->bytecode()->addInsn(BC_ILOAD0);
+        translated_function->bytecode()->addInsn(BC_JA);
+        translated_function->bytecode()->addTyped(1);
+        translated_function->bytecode()->addInsn(BC_ILOAD1);
     }
 
     void push_logic(VarType type, Instruction bc) {
@@ -142,7 +125,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             invalidate();
             break;
         }
-        translated_function.bytecode()->addInsn(bc);
+        translated_function->bytecode()->addInsn(bc);
     }
 
     void push_store(VarType type, uint16_t scope_id, uint16_t var_id) {
@@ -159,13 +142,13 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 
         switch(type) {
         case VT_INT:
-            translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
+            translated_function->bytecode()->addInsn(BC_STORECTXIVAR);
             break;
         case VT_DOUBLE:
-            translated_function.bytecode()->addInsn(BC_STORECTXDVAR);
+            translated_function->bytecode()->addInsn(BC_STORECTXDVAR);
             break;
         case VT_STRING:
-            translated_function.bytecode()->addInsn(BC_STORECTXSVAR);
+            translated_function->bytecode()->addInsn(BC_STORECTXSVAR);
             break;
         default:
             cerr << "Unexpected type " << typeToName(type) << " in STORE" << endl;
@@ -173,8 +156,8 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             break;
         }
 
-        translated_function.bytecode()->addTyped(scope_id);
-        translated_function.bytecode()->addTyped(var_id);
+        translated_function->bytecode()->addTyped(scope_id);
+        translated_function->bytecode()->addTyped(var_id);
 
         return;
     }
@@ -191,9 +174,9 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         VarType type_expr = type_stack.pop();
         if(type_zero == VT_INT && type_expr == VT_INT) {
             // if `cond == 0`, i.e. false -- jump to "after block"
-            translated_function.bytecode()->addInsn(BC_IFICMPE);
-            uint32_t index = translated_function.bytecode()->current();
-            translated_function.bytecode()->addInt16(0); // temporarily
+            translated_function->bytecode()->addInsn(BC_IFICMPE);
+            uint32_t index = translated_function->bytecode()->current();
+            translated_function->bytecode()->addInt16(0); // temporarily
             return index;
         }
 
@@ -204,25 +187,25 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     }
 
     void push_load_i(uint16_t scope_id, uint16_t var_id) {
-        translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
-        translated_function.bytecode()->addTyped(scope_id);
-        translated_function.bytecode()->addTyped(var_id);
+        translated_function->bytecode()->addInsn(BC_LOADCTXIVAR);
+        translated_function->bytecode()->addTyped(scope_id);
+        translated_function->bytecode()->addTyped(var_id);
         type_stack.push(VT_INT);
     }
 
     void push_ja(uint32_t to) {
-        translated_function.bytecode()->addInsn(BC_JA);
-        uint32_t from = translated_function.bytecode()->current();
+        translated_function->bytecode()->addInsn(BC_JA);
+        uint32_t from = translated_function->bytecode()->current();
         uint32_t_t offset = to - from;
         assert(offset == (int16_t)offset);
-        translated_function.bytecode()->addInt16((int16_t)offset);
+        translated_function->bytecode()->addInt16((int16_t)offset);
     }
 
     void update_jmp(uint32_t from) {
-        uint32_t to = translated_function.bytecode()->current();
+        uint32_t to = translated_function->bytecode()->current();
         uint32_t offset = to - from;
         assert(offset == (int16_t)offset);
-        translated_function.bytecode()->setInt16(from, (int16_t)offset);
+        translated_function->bytecode()->setInt16(from, (int16_t)offset);
     }
 
     uint16_t add_scope(Scope* scope) {
@@ -239,17 +222,19 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 
 public:
 
-    BytecodeTranslateVisitor() {}
+    BytecodeTranslateVisitor() = default;
+
+    BytecodeTranslateVisitor(BytecodeFunction* bf, BytecodeCode* bc):
+        BytecodeTranslateVisitor(), translated_function(bf), translated_code(bc) {}
 
     BytecodeTranslateVisitor(const BytecodeTranslateVisitor& b) = default;
 
-    BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, VarType t):
-        BytecodeTranslateVisitor(b), return_type(t) {
-        clear_code();
-    }
+    BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, BytecodeFunction* bf, VarType t):
+        BytecodeTranslateVisitor(b), translated_function(bf), return_type(t) {}
 
-    void clear_code() {
-        translated_code->set_clear();
+    BytecodeCode* program() {
+        translated_code->set_translated_function(translated_function);
+        return translated_code;
     }
 
     BytecodeFunction* allocate_function_copy() {
@@ -367,22 +352,22 @@ public:
         cerr << "[StringLiteral]" << endl;
 
         uint16_t const_id = translated_code->makeStringConstant(node->literal());
-        translated_function.bytecode()->addInsn(BC_SLOAD);
-        translated_function.bytecode()->addTyped(const_id);
+        translated_function->bytecode()->addInsn(BC_SLOAD);
+        translated_function->bytecode()->addTyped(const_id);
     }
 
     virtual void visitDoubleLiteralNode(DoubleLiteralNode* node) {
         cerr << "[DoubleLiteral]" << endl;
 
-        translated_function.bytecode()->addInsn(BC_DLOAD);
-        translated_function.bytecode()->addDouble(node->literal());
+        translated_function->bytecode()->addInsn(BC_DLOAD);
+        translated_function->bytecode()->addDouble(node->literal());
     }
 
     virtual void visitIntLiteralNode(IntLiteralNode* node) {
         cerr << "[IntLiteral]" << endl;
 
-        translated_function.bytecode()->addInsn(BC_ILOAD);
-        translated_function.bytecode()->addInt64(node->literal());
+        translated_function->bytecode()->addInsn(BC_ILOAD);
+        translated_function->bytecode()->addInt64(node->literal());
     }
 
     virtual void visitLoadNode(LoadNode* node) {
@@ -396,13 +381,13 @@ public:
         VarType type = var->type();
         switch(type) {
         case VT_INT:
-            translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
+            translated_function->bytecode()->addInsn(BC_LOADCTXIVAR);
             break;
         case VT_DOUBLE:
-            translated_function.bytecode()->addInsn(BC_LOADCTXDVAR);
+            translated_function->bytecode()->addInsn(BC_LOADCTXDVAR);
             break;
         case VT_STRING:
-            translated_function.bytecode()->addInsn(BC_LOADCTXSVAR);
+            translated_function->bytecode()->addInsn(BC_LOADCTXSVAR);
             break;
         default:
             cerr << "Invalid LOAD type " << typeToName(type)
@@ -411,8 +396,8 @@ public:
             break;
         }
 
-        translated_function.bytecode()->addTyped(scope_id);
-        translated_function.bytecode()->addTyped(var_id);
+        translated_function->bytecode()->addTyped(scope_id);
+        translated_function->bytecode()->addTyped(var_id);
     }
 
     virtual void visitStoreNode(StoreNode* node) {
@@ -429,11 +414,11 @@ public:
         if(op == tINCRSET || op == tDECRSET) {
             switch(type) {
             case VT_INT:
-                translated_function.bytecode()->addInsn(BC_LOADCTXIVAR);
+                translated_function->bytecode()->addInsn(BC_LOADCTXIVAR);
                 type_stack.push(VT_INT);
                 break;
             case VT_DOUBLE:
-                translated_function.bytecode()->addInsn(BC_LOADCTXDVAR);
+                translated_function->bytecode()->addInsn(BC_LOADCTXDVAR);
                 type_stack.push(VT_DOUBLE);
                 break;
             default:
@@ -443,8 +428,8 @@ public:
                 break;
             }
 
-            translated_function.bytecode()->addTyped(scope_id);
-            translated_function.bytecode()->addTyped(var_id);
+            translated_function->bytecode()->addTyped(scope_id);
+            translated_function->bytecode()->addTyped(var_id);
         }
 
         node->value()->visit(this);
@@ -456,8 +441,8 @@ public:
         }
 
         push_store(type, scope_id, var_id);
-//        translated_function.bytecode()->addTyped(scope_id);
-//        translated_function.bytecode()->addTyped(var_id);
+//        translated_function->bytecode()->addTyped(scope_id);
+//        translated_function->bytecode()->addTyped(var_id);
     }
 
     virtual void visitForNode(ForNode* node) {
@@ -489,7 +474,7 @@ public:
         }
         push_store(type, scope_id, var_id);
 
-        uint32_t to_cond_pos = translated_function.bytecode()->current();
+        uint32_t to_cond_pos = translated_function->bytecode()->current();
 
         // make condtion
         push_load_i(scope_id, var_id);
@@ -503,9 +488,9 @@ public:
         }
 
         // set jump
-        translated_function.bytecode()->addInsn(BC_IFICMPG);
-        uint32_t cond_checked_pos= translated_function.bytecode()->current();
-        translated_function.bytecode()->addInt16(0);
+        translated_function->bytecode()->addInsn(BC_IFICMPG);
+        uint32_t cond_checked_pos= translated_function->bytecode()->current();
+        translated_function->bytecode()->addInt16(0);
 
         // loop body
         node->body()->visit(this);
@@ -513,10 +498,10 @@ public:
         // set incr
         push_load_i(scope_id, var_id);
 
-        translated_function.bytecode()->addInsn(BC_ILOAD1);
+        translated_function->bytecode()->addInsn(BC_ILOAD1);
         type_stack.push(VT_INT);
 
-        translated_function.bytecode()->addInsn(BC_IADD);
+        translated_function->bytecode()->addInsn(BC_IADD);
         type = update_type_stack();
         assert(type == VT_INT);
 
@@ -530,10 +515,10 @@ public:
     virtual void visitWhileNode(WhileNode* node) {
         cerr << "[While]" << endl;
 
-        uint32_t to_cond_pos = translated_function.bytecode()->current();
+        uint32_t to_cond_pos = translated_function->bytecode()->current();
 
         node->whileExpr()->visit(this);
-        translated_function.bytecode()->addInsn(BC_ILOAD0);
+        translated_function->bytecode()->addInsn(BC_ILOAD0);
         type_stack.push(VT_INT);
 
         uint32_t cond_checked_pos = push_cond_jump();
@@ -549,30 +534,30 @@ public:
 
         // If...
         node->ifExpr()->visit(this);
-        translated_function.bytecode()->addInsn(BC_ILOAD0);
+        translated_function->bytecode()->addInsn(BC_ILOAD0);
         type_stack.push(VT_INT);
         uint32_t first_jmp_pos = push_cond_jump();
 
         // ... then ...
         node->thenBlock()->visit(this);
-        uint32_t after_then_pos = translated_function.bytecode()->current();
+        uint32_t after_then_pos = translated_function->bytecode()->current();
 
         uint32_t offset = after_then_pos - first_jmp_pos;
         assert(offset == (int16_t)offset);
-        translated_function.bytecode()->setInt16(first_jmp_pos, (int16_t)offset);
+        translated_function->bytecode()->setInt16(first_jmp_pos, (int16_t)offset);
 
         // ... else
         if(node->elseBlock()) {
-            translated_function.bytecode()->addInsn(BC_JA);
-            uint32_t second_jmp_pos = translated_function.bytecode()->current();
-            translated_function.bytecode()->addInt16(0);
+            translated_function->bytecode()->addInsn(BC_JA);
+            uint32_t second_jmp_pos = translated_function->bytecode()->current();
+            translated_function->bytecode()->addInt16(0);
             node->elseBlock()->visit(this);
 
-            uint32_t after_else_pos = translated_function.bytecode()->current();
+            uint32_t after_else_pos = translated_function->bytecode()->current();
             uint32_t offset2 = after_else_pos - second_jmp_pos;
             assert(offset2 == (int16_t)offset2);
 
-            translated_function.bytecode()->setInt16(second_jmp_pos, offset2);
+            translated_function->bytecode()->setInt16(second_jmp_pos, offset2);
         }
     }
 
@@ -586,10 +571,11 @@ public:
 
         for(Scope::FunctionIterator it(node->scope()); it.hasNext();) {
             AstFunction* fun = it.next();
-            BytecodeTranslateVisitor funVisitor(this, fun->node()->returnType());
+            BytecodeFunction* bf = new BytecodeFunction();
+            BytecodeTranslateVisitor funVisitor(this, bf, fun->node()->returnType());
             fun->node()->visit(funVisitor);
 
-            translated_code->addFunction(funVisitor.allocate_function_copy());
+            translated_code->addFunction(bf);
         }
 
         for (uint32_t i = 0; i < node->nodes(); i++) {
@@ -634,7 +620,7 @@ public:
                 return;
             }
         }
-        translated_function.bytecode()->addInsn(BC_RETURN);
+        translated_function->bytecode()->addInsn(BC_RETURN);
     }
 
     virtual void visitCallNode(CallNode* node) {
@@ -665,8 +651,8 @@ public:
             }
         }
 
-        translated_function.bytecode()->addInsn(BC_CALL);
-        translated_function.bytecode()->addTyped(fun.id());
+        translated_function->bytecode()->addInsn(BC_CALL);
+        translated_function->bytecode()->addTyped(fun.id());
     }
 
     virtual void visitNativeCallNode(NativeCallNode* node) {
@@ -686,8 +672,8 @@ public:
         uint16_t nat_id =
                 translated_code->makeNativeFunction(node->nativeName(), node->nativeSignature(), function_handler);
 
-        translated_function.bytecode()->addInsn(BC_CALLNATIVE);
-        translated_function.bytecode()->addTyped(nat_id);
+        translated_function->bytecode()->addInsn(BC_CALLNATIVE);
+        translated_function->bytecode()->addTyped(nat_id);
     }
 
     virtual void visitPrintNode(PrintNode* node) {
@@ -700,13 +686,13 @@ public:
             operand_type = update_type_stack_un();
             switch (operand_type) {
             case VT_INT:
-                translated_function.bytecode()->addInsn(BC_IPRINT);
+                translated_function->bytecode()->addInsn(BC_IPRINT);
                 break;
             case VT_DOUBLE:
-                translated_function.bytecode()->addInsn(BC_DPRINT);
+                translated_function->bytecode()->addInsn(BC_DPRINT);
                 break;
             case VT_STRING:
-                translated_function.bytecode()->addInsn(BC_SPRINT);
+                translated_function->bytecode()->addInsn(BC_SPRINT);
                 break;
             default:
                 cerr << "Invalid operand type for print: " << typeToName(operand_type)
