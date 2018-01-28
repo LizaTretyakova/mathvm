@@ -193,13 +193,13 @@ public:
                 break;
 
             case BC_DLOAD:
-                double dval = cur->getDouble(cur->current());
+                double dval = cur->getDouble(i + 1);
                 value_stack.emplace(dval);
                 i += (sizeof(Instruction) + sizeof(double)) / sizeof(uint8_t);
                 break;
 
             case BC_ILOAD:
-                int64_t ival = cur->getInt64(cur->current());
+                int64_t ival = cur->getInt64(i + 1);
                 value_stack.emplace(ival);
                 i += (sizeof(Instruction) + sizeof(int64_t)) / sizeof(uint8_t);
                 break;
@@ -319,17 +319,70 @@ public:
                 break;
 
             case BC_IFICMPG:
+                t = value_stack.top();
+                value_stack.pop();
+                b = value_stack.top();
+                value_stack.pop();
+                int16_t offset = cur->getTyped(i + 1);
+                i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
+                if(t._intValue > b._intValue) {
+                    i += offset;
+                }
                 break;
+
             case BC_IFICMPGE:
+                t = value_stack.top();
+                value_stack.pop();
+                b = value_stack.top();
+                value_stack.pop();
+                int16_t offset = cur->getTyped(i + 1);
+                i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
+                if(t._intValue >= b._intValue) {
+                    i += offset;
+                }
                 break;
+
             case BC_IFICMPE:
+                t = value_stack.top();
+                value_stack.pop();
+                b = value_stack.top();
+                value_stack.pop();
+                int16_t offset = cur->getTyped(i + 1);
+                i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
+                if(t._intValue == b._intValue) {
+                    i += offset;
+                }
                 break;
+
             case BC_IFICMPLE:
+                t = value_stack.top();
+                value_stack.pop();
+                b = value_stack.top();
+                value_stack.pop();
+                int16_t offset = cur->getTyped(i + 1);
+                i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
+                if(t._intValue <= b._intValue) {
+                    i += offset;
+                }
                 break;
+
             case BC_IFICMPL:
+                t = value_stack.top();
+                value_stack.pop();
+                b = value_stack.top();
+                value_stack.pop();
+                int16_t offset = cur->getTyped(i + 1);
+                i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
+                if(t._intValue < b._intValue) {
+                    i += offset;
+                }
                 break;
+
             case BC_JA:
+                int16_t offset = cur->getTyped(i + 1);
+                i += offset + ((sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t));
                 break;
+
             case BC_LOADCTXDVAR:
                 break;
             case BC_LOADCTXIVAR:
