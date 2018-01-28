@@ -17,12 +17,6 @@ namespace mathvm {
 
 using namespace std;
 
-typedef union {
-    double _doubleValue;
-    int64_t _intValue;
-    const char* _stringValue;
-} Value;
-
 typedef void* (*dl_fun_ptr)();
 
 class BytecodeTranslateVisitor : public AstBaseVisitor {
@@ -129,6 +123,17 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
             invalidate();
             break;
         }
+    }
+
+    void push_condition(Instruction comp_insn) {
+        push_comparison(type, BC_ICMP, BC_DCMP, BC_ICMP);
+        translated_function.bytecode()->addInsn(BC_ILOAD0);
+        push_comparison(VT_INT, comp_insn, comp_insn, comp_insn);
+        translated_function.bytecode()->addTyped(1);
+        translated_function.bytecode()->addInsn(BC_ILOAD1);
+        translated_function.bytecode()->addInsn(BC_JA);
+        translated_function.bytecode()->addTyped(1);
+        translated_function.bytecode()->addInsn(BC_ILOAD0);
     }
 
     void push_logic(VarType type, Instruction bc) {
@@ -289,16 +294,27 @@ public:
             push_logic(BC_IAXOR);
             break;
         case tEQ:
+            // the logic might change but for now it seems that
+            // this is the right version
+            push_condition(BC_IFICMPE);
+            break;
         case tGT:
+            push_condition(BC_IFICMPL);
+            break;
         case tGE:
+            push_condition(BC_IFICMPLE);
+            break;
         case tLT:
+            push_condition(BC_IFICMPG);
+            break;
         case tLE:
-            if(type == VT_INT || type == VT_STRING) {
-                // let's say that strings are only equal if they are the same
-                bytecode.addInsn(BC_ICMP);
-                break;
-            }
-            bytecode.add(BC_DCMP);
+//            if(type == VT_INT || type == VT_STRING) {
+//                // let's say that strings are only equal if they are the same
+//                translated_function.bytecode()->addInsn(BC_ICMP);
+//                break;
+//            }
+//            translated_function.bytecode()->addInsn(BC_DCMP);
+            push_condition(BC_IFICMPGE);
             break;
         case tADD:
             push_numeric(type, BC_IADD, BC_DADD);
