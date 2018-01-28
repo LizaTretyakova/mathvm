@@ -129,11 +129,11 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         push_comparison(type, BC_ICMP, BC_DCMP, BC_ICMP);
         translated_function.bytecode()->addInsn(BC_ILOAD0);
         push_comparison(VT_INT, comp_insn, comp_insn, comp_insn);
-        translated_function.bytecode()->addTyped(1);
-        translated_function.bytecode()->addInsn(BC_ILOAD1);
+        translated_function.bytecode()->addTyped(2 + 2);
+        translated_function.bytecode()->addInsn(BC_ILOAD0);
         translated_function.bytecode()->addInsn(BC_JA);
         translated_function.bytecode()->addTyped(1);
-        translated_function.bytecode()->addInsn(BC_ILOAD0);
+        translated_function.bytecode()->addInsn(BC_ILOAD1);
     }
 
     void push_logic(VarType type, Instruction bc) {
@@ -175,8 +175,6 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 
         translated_function.bytecode()->addTyped(scope_id);
         translated_function.bytecode()->addTyped(var_id);
-//        translated_function.bytecode()->addTyped(scope_id);
-//        translated_function.bytecode()->addTyped(var_id);
 
         return;
     }
@@ -211,12 +209,6 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
         translated_function.bytecode()->addTyped(var_id);
         type_stack.push(VT_INT);
     }
-
-//    void push_store_i(uint16_t scope_id, uint16_t var_id) {
-//        translated_function.bytecode()->addInsn(BC_STORECTXIVAR);
-//        translated_function.bytecode()->addTyped(scope_id);
-//        translated_function.bytecode()->addTyped(var_id);
-//    }
 
     void push_ja(uint32_t to) {
         translated_function.bytecode()->addInsn(BC_JA);
@@ -269,8 +261,9 @@ public:
     virtual void visitBinaryOpNode(BinaryOpNode* node) {
         cerr << "[BinaryOp]" << endl;
 
-        node->left()->visit(this);
+        // Order!
         node->right()->visit(this);
+        node->left()->visit(this);
 
         VarType type = update_type_stack();
         if(type == VT_INVALID || type == VT_VOID) {
@@ -278,7 +271,7 @@ public:
                  << typeToName(type)
                  << ", position " << node->position() << endl;
             invalidate();
-            return; // TODO: signal somehow else?
+            return;
         }
 
         switch(node->kind()) {
@@ -299,22 +292,16 @@ public:
             push_condition(BC_IFICMPE);
             break;
         case tGT:
-            push_condition(BC_IFICMPL);
-            break;
-        case tGE:
-            push_condition(BC_IFICMPLE);
-            break;
-        case tLT:
             push_condition(BC_IFICMPG);
             break;
-        case tLE:
-//            if(type == VT_INT || type == VT_STRING) {
-//                // let's say that strings are only equal if they are the same
-//                translated_function.bytecode()->addInsn(BC_ICMP);
-//                break;
-//            }
-//            translated_function.bytecode()->addInsn(BC_DCMP);
+        case tGE:
             push_condition(BC_IFICMPGE);
+            break;
+        case tLT:
+            push_condition(BC_IFICMPL);
+            break;
+        case tLE:
+            push_condition(BC_IFICMPLE);
             break;
         case tADD:
             push_numeric(type, BC_IADD, BC_DADD);
