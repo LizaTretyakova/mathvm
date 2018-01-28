@@ -11,18 +11,25 @@
 
 namespace mathvm {
 
-typedef union {
+union Value {
     double _doubleValue;
     int64_t _intValue;
     const char* _stringValue;
-} Value;
+
+    Value() = default;
+    Value(double d): _doubleValue(d) {}
+    Value(int64_t i): _intValue(i) {}
+    Value(int i): _intValue((uint64_t)i) {}
+    Value(const char* s): _stringValue(s) {}
+    Value(string s): _stringValue(s.c_str()) {}
+};
 
 class BytecodeCode : public Code {
     typedef map<Scope*, uint16_t> ScopeMap;
     typedef map<string, uint16_t> VarNameMap;
 
     ScopeMap scope_map;
-    vector<Scope*> socpes;
+    vector<Scope*> scopes;
     map<Scope*, VarNameMap> var_map;
 
     BytecodeFunction* translated_function;
@@ -36,7 +43,10 @@ public:
     BytecodeCode() = default;
 
     BytecodeCode(BytecodeFunction* bf, vector<vector<Var>> *v_ptr):
-        BytecodeCode(), translated_function(bf), var_by_scope(v_ptr) {}
+        BytecodeCode() {
+        translated_function = bf;
+        var_by_scope = v_ptr;
+    }
 
     void set_translated_function(BytecodeFunction* bf) {
         translated_function = bf;
@@ -49,23 +59,23 @@ public:
     uint16_t add_scope(Scope* scope) {
         if(!scope_map.count(scope)) {
             uint16_t scope_id = (uint16_t)scope_map.size();
-            scope_map.insert(scope, scope_id);
+            scope_map[scope] = scope_id;
             scopes.push_back(scope);
-            var_map.insert(scope, VarNameMap());
-            var_by_scope.push_back(vector<Var>());
+            var_map[scope] = VarNameMap();
+            var_by_scope->push_back(vector<Var>());
             return scope_id;
         }
         return scope_map[scope];
     }
 
     uint16_t add_var(Scope* scope, VarType type, string name) {
-        uint16_t scope_id = add_scope();
+        uint16_t scope_id = add_scope(scope);
         VarNameMap smap = var_map[scope];
 
         if(!smap.count(name)) {
             uint16_t var_id = smap.size();
-            smap.insert(name, var_id);
-            var_by_scope[scope_id].emplace_back(type, name);
+            smap[name] = var_id;
+            (*var_by_scope)[scope_id].emplace_back(type, name);
             return var_id;
         }
         return smap[name];
@@ -73,22 +83,6 @@ public:
 
     uint16_t add_var(Scope* scope, AstVar* var) {
         return add_var(scope, var->type(), var->name());
-    }
-
-    uint16_t fun_id_by_name(string name) {
-        FunctionMap::const_iterator it = _functionById.find(name);
-        if (it == _functionById.end()) {
-            return 0;
-        }
-        return (*it).second;
-    }
-
-    uint16_t native_id_by_name(string name) {
-        NativeMap::const_iterator it = _nativeById.find(name);
-        if (it == _nativeById.end()) {
-            return 0;
-        }
-        return (*it).second;
     }
 
     /***/
@@ -116,6 +110,21 @@ public:
         uint32_t i = 0;
         Value t;
         Value b;
+        double dval;
+        int64_t ival;
+        int16_t  offset;
+        uint16_t sid;
+        uint16_t scope_id;
+        uint16_t var_id;
+        uint16_t fun_id;
+        uint16_t nat_id;
+        BytecodeFunction* f;
+        Signature* signature;
+        string* name;
+        void* handler;
+        Status* status;
+        int stack_size;
+        int diff;
         while(i < len) {
             Instruction insn = cur->getInsn(i);
             switch(insn) {
@@ -186,21 +195,20 @@ public:
                 break;
 
             case BC_DLOAD:
-                double dval = cur->getDouble(i + 1);
+                dval = cur->getDouble(i + 1);
                 value_stack.emplace(dval);
                 i += (sizeof(Instruction) + sizeof(double)) / sizeof(uint8_t);
                 break;
 
             case BC_ILOAD:
-                int64_t ival = cur->getInt64(i + 1);
+                ival = cur->getInt64(i + 1);
                 value_stack.emplace(ival);
                 i += (sizeof(Instruction) + sizeof(int64_t)) / sizeof(uint8_t);
                 break;
 
             case BC_SLOAD:
-                uint16_t sid = cur->getTyped(i + 1);
-                const string& str = constantById(sid);
-                value_stack.emplace(str);
+                sid = cur->getUInt16(i + 1);
+                value_stack.emplace(constantById(sid));
                 i += (sizeof(Instruction) + sizeof(uint16_t)) / sizeof(uint8_t);
                 break;
 
@@ -251,9 +259,8 @@ public:
                 break;
 
             case BC_SPRINT:
-                uint16_t sid = cur->getTyped(i + 1);
-                const string& str = constantById(sid);
-                cout << str;
+                sid = cur->getUInt16(i + 1);
+                cout << constantById(sid);
                 i += (sizeof(Instruction) + sizeof(uint16_t)) / sizeof(uint8_t);
                 break;
 
@@ -316,7 +323,7 @@ public:
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                int16_t offset = cur->getTyped(i + 1);
+                offset = cur->getInt16(i + 1);
                 i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
                 if(t._intValue > b._intValue) {
                     i += offset;
@@ -328,7 +335,7 @@ public:
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                int16_t offset = cur->getTyped(i + 1);
+                offset = cur->getInt16(i + 1);
                 i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
                 if(t._intValue >= b._intValue) {
                     i += offset;
@@ -340,7 +347,7 @@ public:
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                int16_t offset = cur->getTyped(i + 1);
+                offset = cur->getInt16(i + 1);
                 i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
                 if(t._intValue == b._intValue) {
                     i += offset;
@@ -352,7 +359,7 @@ public:
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                int16_t offset = cur->getTyped(i + 1);
+                offset = cur->getInt16(i + 1);
                 i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
                 if(t._intValue <= b._intValue) {
                     i += offset;
@@ -364,7 +371,7 @@ public:
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                int16_t offset = cur->getTyped(i + 1);
+                offset = cur->getInt16(i + 1);
                 i += (sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t);
                 if(t._intValue < b._intValue) {
                     i += offset;
@@ -372,34 +379,34 @@ public:
                 break;
 
             case BC_JA:
-                int16_t offset = cur->getTyped(i + 1);
+                offset = cur->getInt16(i + 1);
                 i += offset + ((sizeof(Instruction) + sizeof(int16_t)) / sizeof(uint8_t));
                 break;
 
             case BC_LOADCTXDVAR:
-                int16_t scope_id = cur->getTyped(i + 1);
-                int16_t var_id = cur->getTyped(i + 1 + 2);
+                scope_id = cur->getUInt16(i + 1);
+                var_id = cur->getUInt16(i + 1 + 2);
                 value_stack.emplace((*var_by_scope)[scope_id][var_id].getDoubleValue());
                 i += 1 + 2 + 2;
                 break;
 
             case BC_LOADCTXIVAR:
-                int16_t scope_id = cur->getTyped(i + 1);
-                int16_t var_id = cur->getTyped(i + 1 + 2);
+                scope_id = cur->getUInt16(i + 1);
+                var_id = cur->getUInt16(i + 1 + 2);
                 value_stack.emplace((*var_by_scope)[scope_id][var_id].getIntValue());
                 i += 1 + 2 + 2;
                 break;
 
             case BC_LOADCTXSVAR:
-                int16_t scope_id = cur->getTyped(i + 1);
-                int16_t var_id = cur->getTyped(i + 1 + 2);
-                value_stack.emplace((*var_by_scope)[scope_id][var_id].getStringValue);
+                scope_id = cur->getUInt16(i + 1);
+                var_id = cur->getUInt16(i + 1 + 2);
+                value_stack.emplace((*var_by_scope)[scope_id][var_id].getStringValue());
                 i += 1 + 2 + 2;
                 break;
 
             case BC_STORECTXDVAR:
-                int16_t scope_id = cur->getTyped(i + 1);
-                int16_t var_id = cur->getTyped(i + 1 + 2);
+                scope_id = cur->getUInt16(i + 1);
+                var_id = cur->getUInt16(i + 1 + 2);
                 t = value_stack.top();
                 value_stack.pop();
                 (*var_by_scope)[scope_id][var_id].setDoubleValue(t._doubleValue);
@@ -407,8 +414,8 @@ public:
                 break;
 
             case BC_STORECTXIVAR:
-                int16_t scope_id = cur->getTyped(i + 1);
-                int16_t var_id = cur->getTyped(i + 1 + 2);
+                scope_id = cur->getUInt16(i + 1);
+                var_id = cur->getUInt16(i + 1 + 2);
                 t = value_stack.top();
                 value_stack.pop();
                 (*var_by_scope)[scope_id][var_id].setIntValue(t._intValue);
@@ -416,8 +423,8 @@ public:
                 break;
 
             case BC_STORECTXSVAR:
-                int16_t scope_id = cur->getTyped(i + 1);
-                int16_t var_id = cur->getTyped(i + 1 + 2);
+                scope_id = cur->getUInt16(i + 1);
+                var_id = cur->getUInt16(i + 1 + 2);
                 t = value_stack.top();
                 value_stack.pop();
                 (*var_by_scope)[scope_id][var_id].setStringValue(t._stringValue);
@@ -425,28 +432,31 @@ public:
                 break;
 
             case BC_CALL:
-                uint16_t fun_id = cur->getUInt16(i + 1);
-                BytecodeFunction* f = (BytecodeFunction*)functionById(fun_id);
+                fun_id = cur->getUInt16(i + 1);
+                f = (BytecodeFunction*)functionById(fun_id);
                 call_stack.push_back(f->bytecode());
-                int stack_size = value_stack.size();
-                if(call(call_stack.size() - 1)->isError()) {
-                    return Status::Error();
+                stack_size = value_stack.size();
+                status = call(call_stack.size() - 1);
+                if(status->isError()) {
+                    return status;
                 }
-                int diff = value_stack.size() - stack_size;
+                diff = value_stack.size() - stack_size;
                 if(diff != 0 && diff != 1) {
                     cerr << "Suspicious value stack size (d "
                          << diff << ") after function call " << fun_id << endl;
-                    return Status::Error();
+                    return Status::Error("Suspicious value stack size", i);
                 }
                 call_stack.pop_back();
                 i += (sizeof(Instruction) + sizeof(uint16_t)) / sizeof(uint8_t);
                 break;
 
             case BC_CALLNATIVE:
-                uint16_t nat_id = cur->getUInt16(i + 1);
-                Signature* signature;
-                string* name;
-                void* handler = nativeById(nat_id, &signature, &name);
+                nat_id = cur->getUInt16(i + 1);
+//                handler = nativeById(nat_id, &signature, &name);
+                (void)nat_id;
+                (void)handler;
+                (void)signature;
+                (void)name;
                 i += (sizeof(Instruction) + sizeof(uint16_t)) / sizeof(uint8_t);
                 break;
 
@@ -455,7 +465,7 @@ public:
             default:
                 cerr << "Unexpected bytecode " << string(bytecodeName(insn))
                      << "at the position " << i << endl;
-                return Status::Error();
+                return Status::Error("Unexpected bytecode", i);
             }
         }
     }
@@ -465,7 +475,8 @@ public:
         Scope* top_scope = scopes[top_scope_id];
         for(Var* var: vars) {
             if(var_map[top_scope].count(var->name())) {
-                set_var(&(*var_by_scope)[top_scope_id][var->name()], var);
+                uint16_t var_id = var_map[top_scope][var->name()];
+                set_var(&(*var_by_scope)[top_scope_id][var_id], var);
             } else {
                 cerr << "Unknown global var; type " << typeToName(var->type())
                      << ", name " << var->name() << endl;
@@ -477,7 +488,7 @@ public:
     }
 
     /*
-     * BC_CALL
+     *  BC_CALL
         BC_CALLNATIVE
         BC_DADD
         BC_DCMP

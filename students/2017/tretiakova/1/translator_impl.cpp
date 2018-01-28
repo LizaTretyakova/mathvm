@@ -52,11 +52,11 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     }
 
     AstFunction* top = parser->top();
-    BytecodeFunction bf;
-    BytecodeTranslateVisitor visitor(&bf, (*code));
+    BytecodeFunction bf(top);
+    BytecodeTranslateVisitor visitor(&bf, (BytecodeCode*)(*code));
     top->node()->visit(&visitor);
     status = visitor.get_status();
-    (BytecodeCode*)(*code)->set_translated_function(&bf);
+    ((BytecodeCode*)(*code))->set_translated_function(&bf);
     return Status::Ok();
 }
 
