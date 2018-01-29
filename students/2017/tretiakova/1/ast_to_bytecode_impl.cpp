@@ -433,7 +433,20 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
     if(op == tINCRSET) {
         push_numeric(type, BC_IADD, BC_DADD, node->position());
     } else if(op == tDECRSET) {
+        switch(type) {
+        case VT_INT:
+            translated_function->bytecode()->addInsn(BC_ILOAD0);
+            type_stack.push(VT_INT);
+            break;
+        case VT_DOUBLE:
+            translated_function->bytecode()->addInsn(BC_DLOAD0);
+            type_stack.push(VT_DOUBLE);
+            break;
+        default:
+            break;
+        }
         push_numeric(type, BC_ISUB, BC_DSUB, node->position());
+        push_numeric(type, BC_IADD, BC_DADD, node->position());
     }
 
     push_store(type, scope_id, var_id, node->position());

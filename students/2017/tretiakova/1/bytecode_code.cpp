@@ -143,6 +143,30 @@ Status* BytecodeCode::call(int call_id) {
                 value_stack.emplace(ival);
 
                 break;
+            case BC_DLOAD0:
+                out << name << " " << cur->getDouble(bci + 1);
+
+                value_stack.emplace(0.0);
+
+                break;
+            case BC_ILOAD0:
+                out << name << " " << cur->getInt64(bci + 1);
+
+                value_stack.emplace(0);
+
+                break;
+            case BC_DLOAD1:
+                out << name << " " << cur->getDouble(bci + 1);
+
+                value_stack.emplace(1.0);
+
+                break;
+            case BC_ILOAD1:
+                out << name << " " << cur->getInt64(bci + 1);
+
+                value_stack.emplace(1);
+
+                break;
             case BC_SLOAD:
                 out << name << " @" << cur->getUInt16(bci + 1);
 
@@ -475,7 +499,7 @@ Status* BytecodeCode::call(int call_id) {
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                value_stack.emplace(t._intValue && b._intValue);
+                value_stack.emplace(t._intValue & b._intValue);
                 break;
 
             case BC_IAOR:
@@ -484,7 +508,7 @@ Status* BytecodeCode::call(int call_id) {
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                value_stack.emplace(t._intValue || b._intValue);
+                value_stack.emplace(t._intValue | b._intValue);
                 break;
 
             case BC_IAXOR:
@@ -493,7 +517,7 @@ Status* BytecodeCode::call(int call_id) {
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                value_stack.emplace(t._intValue != b._intValue);
+                value_stack.emplace(t._intValue ^ b._intValue);
                 break;
           default:
                 out << name;
