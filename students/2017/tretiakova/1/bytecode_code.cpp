@@ -127,8 +127,6 @@ Status* BytecodeCode::call(int call_id) {
         size_t length;
         Instruction insn = cur->getInsn(bci);
         out << bci << ": ";
-        cerr << "value_stack.size: "
-             << value_stack.size() << endl;
         const char* name = bytecodeName(insn, &length);
         switch (insn) {
             case BC_DLOAD:
@@ -268,7 +266,7 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_IFICMPNE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + 1;
+                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
@@ -281,7 +279,7 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_IFICMPE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + 1;
+                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
@@ -294,7 +292,7 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_IFICMPG:
-                out << name << " " << cur->getInt16(bci + 1) + bci + 1;
+                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
@@ -307,7 +305,7 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_IFICMPGE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + 1;
+                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
@@ -320,7 +318,7 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_IFICMPL:
-                out << name << " " << cur->getInt16(bci + 1) + bci + 1;
+                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
@@ -333,7 +331,7 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_IFICMPLE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + 1;
+                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
@@ -346,7 +344,7 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_JA:
-                out << name << " " << cur->getInt16(bci + 1) + bci + 1;
+                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
 
                 offset = cur->getInt16(bci + 1);
                 bci += offset;

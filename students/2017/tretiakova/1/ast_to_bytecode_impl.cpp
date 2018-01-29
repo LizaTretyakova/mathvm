@@ -170,8 +170,8 @@ uint32_t BytecodeTranslateVisitor::push_cond_jump(uint32_t pos) {
     if(type_zero == VT_INT && type_expr == VT_INT) {
         // if `cond == 0`, i.e. false -- jump to "after block"
         translated_function->bytecode()->addInsn(BC_IFICMPE);
-        uint32_t index = translated_function->bytecode()->current();
         translated_function->bytecode()->addInt16(0); // temporarily
+        uint32_t index = translated_function->bytecode()->current();
         return index;
     }
 
@@ -570,21 +570,30 @@ void BytecodeTranslateVisitor::visitIfNode(IfNode* node) {
     // ... then ...
     node->thenBlock()->visit(this);
     uint32_t after_then_pos = translated_function->bytecode()->current();
-
     uint32_t offset = after_then_pos - first_jmp_pos;
-    translated_function->bytecode()->setInt16(first_jmp_pos, (int16_t)offset);
+    translated_function->bytecode()->setInt16(first_jmp_pos - 2, (int16_t)offset);
+    // this offset is for the no-else-block case only!!!
 
     // ... else
     if(node->elseBlock()) {
         translated_function->bytecode()->addInsn(BC_JA);
-        uint32_t second_jmp_pos = translated_function->bytecode()->current();
         translated_function->bytecode()->addInt16(0);
+        uint32_t second_jmp_pos = translated_function->bytecode()->current();
+        assert(second_jmp_pos == after_then_pos + 3);
+
+        // correct the first jump offset by 3 bytes from JA
+        offset = second_jmp_pos - first_jmp_pos;
+        translated_function->bytecode()->setInt16(first_jmp_pos - 2, (int16_t)offset);
+
         node->elseBlock()->visit(this);
 
         uint32_t after_else_pos = translated_function->bytecode()->current();
         uint32_t offset2 = after_else_pos - second_jmp_pos;
 
-        translated_function->bytecode()->setInt16(second_jmp_pos, offset2);
+        translated_function->bytecode()->setInt16(second_jmp_pos - 2, offset2);
+        // again, -2 because `pos` point to the first block
+        // after the JA offset, the JA offset takes 2 bytes
+        // ==> (`pos` - 2) is the pos of the offset itself
     }
 }
 
