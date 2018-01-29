@@ -18,12 +18,14 @@ using namespace std;
 
 void BytecodeTranslateVisitor::invalidate(string msg, uint32_t pos) {
 //        type_stack.pop();
+    cerr << "[Translator] invalidate INVALID";
     type_stack.push(VT_INVALID);
     status = Status::Error(msg.c_str(), pos);
 }
 
 VarType BytecodeTranslateVisitor::update_type_stack_un() { // check
     if(type_stack.size() < 1) {
+        cerr << "[Translator] type stack too small (<1) INVALID";
         type_stack.push(VT_INVALID);
         return VT_INVALID;
     }
@@ -32,6 +34,7 @@ VarType BytecodeTranslateVisitor::update_type_stack_un() { // check
 
 VarType BytecodeTranslateVisitor::update_type_stack() {
     if(type_stack.size() < 2) {
+        cerr << "[Translator] type stack too small (<2) INVALID";
         type_stack.push(VT_INVALID);
         return VT_INVALID;
     }
@@ -54,6 +57,8 @@ VarType BytecodeTranslateVisitor::update_type_stack() {
         break;
     }
 
+    cerr << "[Translator] update type stack, new "
+         << typeToName(result) << endl;
     type_stack.push(result);
     return result;
 }
@@ -252,6 +257,9 @@ void BytecodeTranslateVisitor::visitBinaryOpNode(BinaryOpNode* node) {
     case tAXOR:
         push_logic(type, BC_IAXOR, node->position());
         break;
+    case tNEQ:
+        push_condition(type, BC_IFICMPNE, node->position());
+        break;
     case tEQ:
         // the logic might change but for now it seems that
         // this is the right version
@@ -338,7 +346,7 @@ void BytecodeTranslateVisitor::visitStringLiteralNode(StringLiteralNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitDoubleLiteralNode(DoubleLiteralNode* node) {
-    cerr << "bytecode [DoubleLiteral]" << node->literal() << endl;
+    cerr << "[DoubleLiteral]" << endl;
 
     translated_function->bytecode()->addInsn(BC_DLOAD);
     translated_function->bytecode()->addDouble(node->literal());

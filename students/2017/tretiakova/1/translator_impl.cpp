@@ -52,18 +52,18 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     }
 
     AstFunction* top = parser->top();
-    BytecodeFunction bf(top);
+    //BytecodeFunction bf(top);
     (*code) = new BytecodeCode();
-    BytecodeTranslateVisitor visitor(&bf, (BytecodeCode*)(*code));
+    ((BytecodeCode*)(*code))->set_translated_function(new BytecodeFunction(top));
+    BytecodeTranslateVisitor visitor(
+                ((BytecodeCode*)(*code))->get_translated_function(),
+                (BytecodeCode*)(*code));
     top->node()->visit(&visitor);
     status = visitor.get_status();
 
-    cerr << "[translator_impl] *code before "
-         << ((BytecodeCode*)(*code))->get_translated_function()->bytecode() << endl;
-    ((BytecodeCode*)(*code))->set_translated_function(&bf);
-    cerr << "[translator_impl] *code after "
-         << ((BytecodeCode*)(*code))->get_translated_function()->bytecode() << endl;
-    cerr << "[translator_impl] bf " << bf.bytecode() << endl;
+//    ((BytecodeCode*)(*code))->set_translated_function(&bf);
+
+    delete parser;
 
     return Status::Ok();
 }
