@@ -127,6 +127,8 @@ Status* BytecodeCode::call(int call_id) {
         size_t length;
         Instruction insn = cur->getInsn(bci);
         out << bci << ": ";
+        cerr << "value_stack.size: "
+             << value_stack.size() << endl;
         const char* name = bytecodeName(insn, &length);
         switch (insn) {
             case BC_DLOAD:
