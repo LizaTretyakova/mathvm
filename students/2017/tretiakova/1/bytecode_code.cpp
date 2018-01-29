@@ -33,6 +33,7 @@ uint16_t BytecodeCode::add_scope(Scope* scope) {
     if(!scope_map.count(scope)) {
         uint16_t scope_id = (uint16_t)scope_map.size();
         scope_map[scope] = scope_id;
+        assert(scope_id == scopes.size());
         scopes.push_back(scope);
         var_map[scope] = VarNameMap();
         var_by_scope->push_back(vector<Var>());
@@ -43,15 +44,14 @@ uint16_t BytecodeCode::add_scope(Scope* scope) {
 
 uint16_t BytecodeCode::add_var(Scope* scope, VarType type, string name) {
     uint16_t scope_id = add_scope(scope);
-    VarNameMap smap = var_map[scope];
-
-    if(!smap.count(name)) {
-        uint16_t var_id = smap.size();
-        smap[name] = var_id;
+    if(!var_map[scope].count(name)) {
+        uint16_t var_id = var_map[scope].size();
+        assert(var_id == (*var_by_scope)[scope_id].size());
+        var_map[scope][name] = var_id;
         (*var_by_scope)[scope_id].emplace_back(type, name);
         return var_id;
     }
-    return smap[name];
+    return var_map[scope][name];
 }
 
 uint16_t BytecodeCode::add_var(Scope* scope, AstVar* var) {
@@ -447,6 +447,17 @@ Status* BytecodeCode::call(int call_id) {
     return Status::Ok();
 }
 
+void print_vars(vector<vector<Var>>& vars) {
+    for(int i = 0; i < (int)vars.size(); ++i) {
+        cout << "scope " << i << ": ";
+        for(int j = 0; j < (int)vars[i].size(); ++j) {
+            cout << "(" << typeToName(vars[i][j].type())
+                 << " " << vars[i][j].name() << ") ";
+        }
+        cout << endl;
+    }
+}
+
 Status* BytecodeCode::execute(vector<Var *> &vars) {
     uint16_t top_scope_id = 0;
     Scope* top_scope = scopes[top_scope_id];
@@ -455,6 +466,8 @@ Status* BytecodeCode::execute(vector<Var *> &vars) {
             uint16_t var_id = var_map[top_scope][var->name()];
             set_var(&(*var_by_scope)[top_scope_id][var_id], var);
         } else {
+            print_vars(*var_by_scope);
+
             cerr << "Unknown global var; type " << typeToName(var->type())
                  << ", name " << var->name() << endl;
         }

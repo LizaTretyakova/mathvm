@@ -18,14 +18,15 @@ int main(int argc, char** argv) {
     for (int32_t i = 1; i < argc; i++) {
       if (string(argv[i]) == "-j") {
         impl = "jit";
-      }  if (string(argv[i]) == "-p") {
+      } else if (string(argv[i]) == "-p") {
         impl = "printer";
-      } if (string(argv[i]) == "-i") {
+      } else if (string(argv[i]) == "-i") {
         impl = "interpreter";
       } else {
         script = argv[i];
       }
     }
+
     Translator* translator = Translator::create(impl);
 
     const char* expr = "double x; double y;"
