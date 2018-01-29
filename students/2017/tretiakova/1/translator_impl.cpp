@@ -45,7 +45,7 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
 
     Status* status = parser->parseProgram(program);
     if (status->isError()) {
-        std::cerr << "[PrinterTranslator] parser errored with message "
+        std::cerr << "[BytecodeTranslator] parser errored with message "
                   << status->getMsg() << std::endl;
         *code = 0;
         return status;
@@ -53,6 +53,7 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
 
     AstFunction* top = parser->top();
     BytecodeFunction bf(top);
+    (*code) = new BytecodeCode();
     BytecodeTranslateVisitor visitor(&bf, (BytecodeCode*)(*code));
     top->node()->visit(&visitor);
     status = visitor.get_status();
@@ -64,7 +65,7 @@ Translator* Translator::create(const string& impl) {
     if (impl == "printer") {
         return new PrinterTranslator();
     }
-    if (impl == "" || impl == "intepreter") {
+    if (impl == "" || impl == "interpreter") {
         return new BytecodeTranslatorImpl();
     }
     if (impl == "jit") {

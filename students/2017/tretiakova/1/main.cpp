@@ -1,6 +1,7 @@
 #include "../include/mathvm.h"
 #include "include/ast_to_bytecode_impl.h"
 #include "include/bytecode_code.h"
+#include "include/ast_printer_impl.h"
 
 #include <stdio.h>
 #include <fcntl.h>
