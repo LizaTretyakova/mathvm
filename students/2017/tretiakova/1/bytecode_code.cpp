@@ -466,17 +466,24 @@ void print_vars(vector<vector<Var>>& vars) {
 
 Status* BytecodeCode::execute(vector<Var *> &vars) {
     uint16_t top_scope_id = 0;
-    Scope* top_scope = scopes[top_scope_id];
+//    Scope* top_scope = scopes[top_scope_id];
     for(Var* var: vars) {
-        if(var_map[top_scope].count(var->name())) {
-            uint16_t var_id = var_map[top_scope][var->name()];
-            set_var(&(*var_by_scope)[top_scope_id][var_id], var);
-        } else {
+//        if(var_map[top_scope].count(var->name())) {
+        for(int i = 0; i < (int)(*var_by_scope)[top_scope_id].size(); ++i) {
+            Var v = (*var_by_scope)[top_scope_id][i];
+            if(v.name() != var->name()) {
+                continue;
+            }
+//            uint16_t var_id = var_map[top_scope][var->name()];
+            set_var(&(*var_by_scope)[top_scope_id][i], var);
+            break;
+        }
+        /* else {
             print_vars(*var_by_scope);
 
             cerr << "Unknown global var; type " << typeToName(var->type())
                  << ", name " << var->name() << endl;
-        }
+        } */
     }
     call_stack.push_back(translated_function->bytecode());
 //    cerr << call_stack[0] << endl;

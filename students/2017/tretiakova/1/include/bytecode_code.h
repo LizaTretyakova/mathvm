@@ -32,8 +32,8 @@ class BytecodeCode : public Code {
     vector<Scope*> scopes;
     map<Scope*, VarNameMap> var_map;
 
-    BytecodeFunction* translated_function;
-    vector<vector<Var>> *var_by_scope;
+    BytecodeFunction* translated_function = NULL;
+    vector<vector<Var>> *var_by_scope = NULL;
 
     vector<uint16_t> scope_stack;
     stack<Value> value_stack;
