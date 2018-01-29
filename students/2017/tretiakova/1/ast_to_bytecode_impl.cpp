@@ -112,16 +112,16 @@ void BytecodeTranslateVisitor::push_logic(VarType type, Instruction bc, uint32_t
 }
 
 void BytecodeTranslateVisitor::push_store(VarType type, uint16_t scope_id, uint16_t var_id, uint32_t pos) {
-    VarType last_type = update_type_stack_un();
-    if(last_type != type) {
-        cerr << "Type mismatch in STORE, expected " << typeToName(last_type)
-             << ", got " << typeToName(type) << endl;
-        invalidate("Type mismatch in STORE", pos);
-        return;
-    }
+//    VarType last_type = update_type_stack_un();
+//    if(last_type != type) {
+//        cerr << "Type mismatch in STORE, expected " << typeToName(last_type)
+//             << ", got " << typeToName(type) << endl;
+//        invalidate("Type mismatch in STORE", pos);
+//        return;
+//    }
 
-    // because STORE will take one value from stack
-    type_stack.pop();
+//    // because STORE will take one value from stack
+//    type_stack.pop();
 
     switch(type) {
     case VT_INT:

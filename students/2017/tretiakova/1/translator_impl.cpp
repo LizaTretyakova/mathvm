@@ -57,7 +57,14 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     BytecodeTranslateVisitor visitor(&bf, (BytecodeCode*)(*code));
     top->node()->visit(&visitor);
     status = visitor.get_status();
+
+    cerr << "[translator_impl] *code before "
+         << ((BytecodeCode*)(*code))->get_translated_function()->bytecode() << endl;
     ((BytecodeCode*)(*code))->set_translated_function(&bf);
+    cerr << "[translator_impl] *code after "
+         << ((BytecodeCode*)(*code))->get_translated_function()->bytecode() << endl;
+    cerr << "[translator_impl] bf " << bf.bytecode() << endl;
+
     return Status::Ok();
 }
 

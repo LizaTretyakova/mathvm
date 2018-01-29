@@ -79,6 +79,7 @@ void BytecodeCode::set_var(Var* to, Var* from) {
 
 Status* BytecodeCode::call(int call_id) {
     Bytecode* cur = call_stack[call_id];
+    // cerr << call_stack[call_id] << endl;
     uint32_t len = cur->length();
     uint32_t i = 0;
 
@@ -103,6 +104,10 @@ Status* BytecodeCode::call(int call_id) {
 
     while(i < len) {
         Instruction insn = cur->getInsn(i);
+        cerr << "Insn: " << insn
+             << " i: " << i
+             << " len: " << len << endl;
+
         switch(insn) {
         case BC_DADD:
             t = value_stack.top();
@@ -439,10 +444,11 @@ Status* BytecodeCode::call(int call_id) {
         case BC_RETURN:
             return Status::Ok();
         default:
-            cerr << "Unexpected bytecode " << string(bytecodeName(insn))
-                 << "at the position " << i << endl;
+            cerr << "Unexpected bytecode " << insn
+                 << " at the position " << i << endl;
             return Status::Error("Unexpected bytecode", i);
         }
+        cerr << "Finished [" << bytecodeName(insn) << "]" << endl;
     }
     return Status::Ok();
 }
@@ -473,6 +479,8 @@ Status* BytecodeCode::execute(vector<Var *> &vars) {
         }
     }
     call_stack.push_back(translated_function->bytecode());
+//    cerr << call_stack[0] << endl;
+//    cerr << translated_function->bytecode() << endl;
     Status* status = call(0);
     return status;
 }

@@ -51,6 +51,10 @@ public:
 //        var_by_scope = v_ptr;
 //    }
 
+    BytecodeFunction* get_translated_function() {
+        return translated_function;
+    }
+
     void set_translated_function(BytecodeFunction* bf);
     vector<vector<Var> > get_var_by_scope();
     uint16_t add_scope(Scope* scope);
