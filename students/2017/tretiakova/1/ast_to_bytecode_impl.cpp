@@ -79,6 +79,9 @@ void BytecodeTranslateVisitor::push_numeric(VarType type, Instruction i_bc, Inst
 }
 
 void BytecodeTranslateVisitor::push_comparison(VarType type, Instruction i_bc, Instruction d_bc, Instruction s_bc, uint32_t pos) {
+    type_stack.pop();
+    type_stack.push(VT_INT);
+
     switch(type) {
     case VT_INT:
         translated_function->bytecode()->addInsn(i_bc);
@@ -97,10 +100,12 @@ void BytecodeTranslateVisitor::push_comparison(VarType type, Instruction i_bc, I
 }
 
 void BytecodeTranslateVisitor::push_condition(VarType type, Instruction comp_insn, uint32_t pos) {
-    push_comparison(type, BC_ICMP, BC_DCMP, BC_ICMP, pos);
-    translated_function->bytecode()->addInsn(BC_ILOAD0);
-    push_comparison(VT_INT, comp_insn, comp_insn, comp_insn, pos);
-    translated_function->bytecode()->addInt16(2 + 2);
+    type_stack.pop();
+    type_stack.push(VT_INT);
+    // what we leave after comparison
+
+    translated_function->bytecode()->addInsn(comp_insn);
+    translated_function->bytecode()->addInt16(2 + 2); // if true, goto load1
     translated_function->bytecode()->addInsn(BC_ILOAD0);
     translated_function->bytecode()->addInsn(BC_JA);
     translated_function->bytecode()->addInt16(1);
@@ -323,8 +328,20 @@ void BytecodeTranslateVisitor::visitUnaryOpNode(UnaryOpNode* node) {
             invalidate("Non-int operand in tNOT", node->position());
             break;
         }
-        translated_function->bytecode()->addUInt16(0);
-        translated_function->bytecode()->addInsn(BC_ICMP);
+        // translated_function->bytecode()->addInsn(BC_ICMP);
+
+        translated_function->bytecode()->addInsn(BC_ILOAD0);
+        // pushed int
+        translated_function->bytecode()->addInsn(BC_IFICMPE);
+        // removed 2 x ints and pushed one -- bal 0
+        translated_function->bytecode()->addInt16(4);
+        translated_function->bytecode()->addInsn(BC_ILOAD0);
+        translated_function->bytecode()->addInsn(BC_JA);
+        translated_function->bytecode()->addInt16(1);
+        translated_function->bytecode()->addInsn(BC_ILOAD1);
+        // after all, pushed one
+        type_stack.push(VT_INT);
+
         break;
     case tSUB:
         push_numeric(type, BC_INEG, BC_DNEG, node->position());

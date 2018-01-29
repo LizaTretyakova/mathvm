@@ -144,25 +144,25 @@ Status* BytecodeCode::call(int call_id) {
 
                 break;
             case BC_DLOAD0:
-                out << name << " " << cur->getDouble(bci + 1);
+                out << name;
 
                 value_stack.emplace(0.0);
 
                 break;
             case BC_ILOAD0:
-                out << name << " " << cur->getInt64(bci + 1);
+                out << name;
 
                 value_stack.emplace(0);
 
                 break;
             case BC_DLOAD1:
-                out << name << " " << cur->getDouble(bci + 1);
+                out << name;
 
                 value_stack.emplace(1.0);
 
                 break;
             case BC_ILOAD1:
-                out << name << " " << cur->getInt64(bci + 1);
+                out << name;
 
                 value_stack.emplace(1);
 
@@ -268,7 +268,14 @@ Status* BytecodeCode::call(int call_id) {
             case BC_IFICMPNE:
                 out << name << " " << cur->getInt16(bci + 1) + bci + 1;
 
-
+                t = value_stack.top();
+                value_stack.pop();
+                b = value_stack.top();
+                value_stack.pop();
+                offset = cur->getInt16(bci + 1);
+                if(t._intValue != b._intValue) {
+                    bci += offset;
+                }
 
                 break;
             case BC_IFICMPE:
