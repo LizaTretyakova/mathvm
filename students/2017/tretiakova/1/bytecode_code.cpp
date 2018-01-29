@@ -97,13 +97,12 @@ void BytecodeCode::set_var(Var* to, Var* from) {
 Status* BytecodeCode::call(int call_id) {
     Bytecode* cur = call_stack[call_id];
     ofstream out("debug.output");
-
     // cerr << call_stack[call_id] << endl;
     assert(call_id < (int)call_stack.size());
 //    uint32_t len = cur->length();
 //    uint32_t i = 0;
 
-    cur->dump(cout);
+    cur->dump(out);
 
     // cannot define them in the switch-block
     Value t;
@@ -438,8 +437,9 @@ Status* BytecodeCode::call(int call_id) {
 
             case BC_SPRINT:
                 out << name;
-                sid = cur->getUInt16(bci + 1);
-                cout << string(constantById(sid));
+                t = value_stack.top();
+                value_stack.pop();
+                cout << t._stringValue;
                 break;
 
             case BC_DSUB:
