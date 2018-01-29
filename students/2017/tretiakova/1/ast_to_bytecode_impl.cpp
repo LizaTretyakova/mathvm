@@ -341,8 +341,10 @@ void BytecodeTranslateVisitor::visitStringLiteralNode(StringLiteralNode* node) {
     cerr << "[StringLiteral]" << endl;
 
     uint16_t const_id = translated_code->makeStringConstant(node->literal());
+    cerr << "const_id: " << const_id << " literal: " << node->literal() << endl;
     translated_function->bytecode()->addInsn(BC_SLOAD);
     translated_function->bytecode()->addUInt16(const_id);
+    type_stack.push(VT_STRING);
 }
 
 void BytecodeTranslateVisitor::visitDoubleLiteralNode(DoubleLiteralNode* node) {
@@ -350,6 +352,7 @@ void BytecodeTranslateVisitor::visitDoubleLiteralNode(DoubleLiteralNode* node) {
 
     translated_function->bytecode()->addInsn(BC_DLOAD);
     translated_function->bytecode()->addDouble(node->literal());
+    type_stack.push(VT_DOUBLE);
 }
 
 void BytecodeTranslateVisitor::visitIntLiteralNode(IntLiteralNode* node) {
@@ -357,6 +360,7 @@ void BytecodeTranslateVisitor::visitIntLiteralNode(IntLiteralNode* node) {
 
     translated_function->bytecode()->addInsn(BC_ILOAD);
     translated_function->bytecode()->addInt64(node->literal());
+    type_stack.push(VT_INT);
 }
 
 void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
@@ -371,12 +375,15 @@ void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
     switch(type) {
     case VT_INT:
         translated_function->bytecode()->addInsn(BC_LOADCTXIVAR);
+        type_stack.push(VT_INT);
         break;
     case VT_DOUBLE:
         translated_function->bytecode()->addInsn(BC_LOADCTXDVAR);
+        type_stack.push(VT_DOUBLE);
         break;
     case VT_STRING:
         translated_function->bytecode()->addInsn(BC_LOADCTXSVAR);
+        type_stack.push(VT_STRING);
         break;
     default:
         cerr << "Invalid LOAD type " << typeToName(type)
@@ -677,6 +684,7 @@ void BytecodeTranslateVisitor::visitPrintNode(PrintNode* node) {
         node->operandAt(i)->visit(this);
 
         operand_type = update_type_stack_un();
+        type_stack.pop();
         switch (operand_type) {
         case VT_INT:
             translated_function->bytecode()->addInsn(BC_IPRINT);
