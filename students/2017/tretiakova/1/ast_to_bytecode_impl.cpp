@@ -497,18 +497,19 @@ void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
     uint16_t var_id = add_var(scope, var->type(), var->name());
 
     VarType type = var->type();
-    if(type != VT_INT) {
+    VarType left_type = update_type_stack_un();
+    if(type != VT_INT || left_type != VT_INT) {
         cerr << "non-int iterator in for, position " << node->position() << endl;
         invalidate("non-int iterator in for", node->position());
         return;
     }
-    push_store(type, scope_id, var_id, node->position());
+    type_stack.pop();
 
+    push_store(type, scope_id, var_id, node->position());
     uint32_t to_cond_pos = translated_function->bytecode()->current();
 
     // make condtion
     push_load_i(scope_id, var_id);
-
     range->right()->visit(this);
     type = update_type_stack_un();
     if(type != VT_INT) {
@@ -518,23 +519,17 @@ void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
     }
 
     // set jump
-    translated_function->bytecode()->addInsn(BC_IFICMPG);
-    uint32_t cond_checked_pos= translated_function->bytecode()->current();
+    translated_function->bytecode()->addInsn(BC_IFICMPL); // it needs to be false to step out of the loop
     translated_function->bytecode()->addInt16(0);
+    uint32_t cond_checked_pos= translated_function->bytecode()->current();
 
     // loop body
     node->body()->visit(this);
 
     // set incr
     push_load_i(scope_id, var_id);
-
     translated_function->bytecode()->addInsn(BC_ILOAD1);
-    type_stack.push(VT_INT);
-
     translated_function->bytecode()->addInsn(BC_IADD);
-    type = update_type_stack();
-    assert(type == VT_INT);
-
     push_store(type, scope_id, var_id, node->position());
 
     // jump
@@ -551,12 +546,10 @@ void BytecodeTranslateVisitor::visitWhileNode(WhileNode* node) {
     node->whileExpr()->visit(this);
     translated_function->bytecode()->addInsn(BC_ILOAD0);
     type_stack.push(VT_INT);
-
     uint32_t cond_checked_pos = push_cond_jump(node->position());
 
     node->loopBlock()->visit(this);
     push_ja(to_cond_pos);
-
     update_jmp(cond_checked_pos);
 }
 
