@@ -189,16 +189,17 @@ void BytecodeTranslateVisitor::push_load_i(uint16_t scope_id, uint16_t var_id) {
 }
 
 void BytecodeTranslateVisitor::push_ja(uint32_t to) {
-    translated_function->bytecode()->addInsn(BC_JA);
-    uint32_t from = translated_function->bytecode()->current();
+    uint32_t from = translated_function->bytecode()->current() + 3;
     uint32_t offset = to - from;
+    translated_function->bytecode()->addInsn(BC_JA);
     translated_function->bytecode()->addInt16((int16_t)offset);
 }
 
-void BytecodeTranslateVisitor::update_jmp(uint32_t from) {
-    uint32_t to = translated_function->bytecode()->current();
-    uint32_t offset = to - from;
-    translated_function->bytecode()->setInt16(from, (int16_t)offset);
+void BytecodeTranslateVisitor::update_jmp(uint32_t src) {
+    uint32_t cur = translated_function->bytecode()->current();
+    uint32_t offset = cur - src;
+    translated_function->bytecode()->setInt16(src - 2, (int16_t)offset);
+    // -2 because the offset
 }
 
 uint16_t BytecodeTranslateVisitor::add_scope(Scope* scope) {
@@ -545,6 +546,7 @@ void BytecodeTranslateVisitor::visitWhileNode(WhileNode* node) {
     cerr << "[While]" << endl;
 
     uint32_t to_cond_pos = translated_function->bytecode()->current();
+    // right!
 
     node->whileExpr()->visit(this);
     translated_function->bytecode()->addInsn(BC_ILOAD0);
