@@ -38,6 +38,8 @@ class BytecodeCode : public Code {
     vector<uint16_t> scope_stack;
     stack<Value> value_stack;
     vector<Bytecode*> call_stack;
+
+    void print_funs();
 public:
 
     BytecodeCode() {

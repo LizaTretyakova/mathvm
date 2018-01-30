@@ -12,17 +12,6 @@
 
 namespace mathvm {
 
-//    BytecodeCode() {
-//        translated_function = NULL;
-//        var_by_scope = new vector<vector<Var>>();
-//    }
-
-//    BytecodeCode(BytecodeFunction* bf, vector<vector<Var>> *v_ptr):
-//        BytecodeCode() {
-//        translated_function = bf;
-//        var_by_scope = v_ptr;
-//    }
-
 void BytecodeCode::set_translated_function(BytecodeFunction* bf) {
     translated_function = bf;
 }
@@ -101,8 +90,6 @@ Status* BytecodeCode::call(int call_id) {
     assert(call_id < (int)call_stack.size());
 //    uint32_t len = cur->length();
 //    uint32_t i = 0;
-
-    cur->dump(out);
 
     // cannot define them in the switch-block
     Value t;
@@ -185,10 +172,14 @@ Status* BytecodeCode::call(int call_id) {
                 if(status->isError()) {
                     return status;
                 }
-                diff = value_stack.size() - stack_size;
-                if(diff != 0 && diff != 1) {
-                    cerr << "Suspicious value stack size (d "
-                         << diff << ") after function call " << fun_id << endl;
+                diff = stack_size - value_stack.size();
+                if(diff != f->parametersNumber() && diff != f->parametersNumber() - 1) {
+                    cerr << "Suspicious value stack size ("
+                         << "was " << stack_size
+                         << ", became " << value_stack.size()
+                         << ") after function call '"
+                         << functionById(fun_id)->name()
+                         << "'" << endl;
                     return Status::Error("Suspicious value stack size", bci);
                 }
                 call_stack.pop_back();
@@ -546,25 +537,33 @@ void print_vars(vector<vector<Var>>& vars) {
     }
 }
 
+void BytecodeCode::print_funs() {
+    int it;
+    BytecodeFunction* fun;
+    cerr << "function: " << translated_function->name() << ":" << endl;
+    translated_function->bytecode()->dump(cerr);
+    for(it = 0, fun = (BytecodeFunction*)functionById(it); fun != 0; ++it, fun = (BytecodeFunction*)functionById(it)) {
+        cerr << "function " << fun->name() << ": " << endl;
+        fun->bytecode()->dump(cerr);
+    }
+}
+
 Status* BytecodeCode::execute(vector<Var *> &vars) {
+    print_funs();
+
     uint16_t top_scope_id = 0;
-//    Scope* top_scope = scopes[top_scope_id];
     for(Var* var: vars) {
-//        if(var_map[top_scope].count(var->name())) {
         for(int i = 0; i < (int)(*var_by_scope)[top_scope_id].size(); ++i) {
             Var v = (*var_by_scope)[top_scope_id][i];
             if(v.name() != var->name()) {
                 continue;
             }
-//            uint16_t var_id = var_map[top_scope][var->name()];
             set_var(&(*var_by_scope)[top_scope_id][i], var);
             break;
         }
 
     }
     call_stack.push_back(translated_function->bytecode());
-//    cerr << call_stack[0] << endl;
-//    cerr << translated_function->bytecode() << endl;
     Status* status = call(0);
     return status;
 }

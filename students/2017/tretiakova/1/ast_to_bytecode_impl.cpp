@@ -210,22 +210,6 @@ uint16_t BytecodeTranslateVisitor::add_var(Scope* scope, VarType type, string na
     return translated_code->add_var(scope, type, name);
 }
 
-//BytecodeTranslateVisitor() = default;
-
-//BytecodeTranslateVisitor(BytecodeFunction* bf, BytecodeCode* bc):
-//    BytecodeTranslateVisitor() {
-//    translated_function = bf;
-//    translated_code = bc;
-//}
-
-//BytecodeTranslateVisitor(const BytecodeTranslateVisitor& b) = default;
-
-//BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, BytecodeFunction* bf, VarType t):
-//    BytecodeTranslateVisitor(b) {
-//    translated_function = bf;
-//    return_type = t;
-//}
-
 BytecodeCode* BytecodeTranslateVisitor::program() {
     translated_code->set_translated_function(translated_function);
     return translated_code;
@@ -595,18 +579,24 @@ void BytecodeTranslateVisitor::visitIfNode(IfNode* node) {
 void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
     cerr << "[Block]" << endl;
 
-//        for(Scope::VarIterator it(node->scope()); it.hasNext();) {
-//            AstVar* var = it.next();
-//            store_var(scope, var);
-//        }
+    Scope* block_scope = node->scope();
+    add_scope(block_scope);
 
-    for(Scope::FunctionIterator it(node->scope()); it.hasNext();) {
+    for(Scope::FunctionIterator it(block_scope); it.hasNext();) {
         AstFunction* fun = it.next();
         BytecodeFunction* bf = new BytecodeFunction(fun);
         BytecodeTranslateVisitor funVisitor(*this, bf, fun->node()->returnType());
         fun->node()->visit(&funVisitor);
 
         translated_code->addFunction(bf);
+    }
+
+    for(Scope::VarIterator it(block_scope); it.hasNext();) {
+        AstVar* var = it.next();
+        Scope* scope = var->owner();
+        uint16_t scope_id = add_scope(scope);
+        uint16_t var_id = add_var(scope, var->type(), var->name());
+        push_store(var->type(), scope_id, var_id, node->position());
     }
 
     for (uint32_t i = 0; i < node->nodes(); i++) {
@@ -616,19 +606,6 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
 
 void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
     cerr << "[Function]" << node->name() << endl;
-
-    Scope* scope = node->body()->scope();
-    uint16_t scope_id = add_scope(scope);
-
-    for(uint32_t i = 0; i < node->parametersNumber(); i++) {
-        VarType parameterType = node->parameterType(i);
-        string parameterName = node->parameterName(i);
-
-        uint16_t var_id = add_var(scope, parameterType, parameterName);
-
-        push_store(parameterType, scope_id, var_id, node->position());
-    }
-
     node->body()->visit(this);
 }
 
@@ -667,7 +644,8 @@ void BytecodeTranslateVisitor::visitCallNode(CallNode* node) {
     }
 
     VarType param_type, stack_type;
-    for(uint32_t i = 0; i < node->parametersNumber(); i++) {
+    for(int i = node->parametersNumber() - 1; i >= 0; --i) {
+    // need reversed order
         node->parameterAt(i)->visit(this);
 
         param_type = fun->parameterType(i);
