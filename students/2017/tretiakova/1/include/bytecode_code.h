@@ -78,13 +78,13 @@ class BytecodeCode : public Code {
 
     uint16_t top_function_id = 0;
 
-    void print_funs();
+    void print_funs(ofstream& out);
 public:
 
     uint16_t add_scope(Scope* scope);
     int add_var(Scope* scope, VarType type, string name);
     int get_scope_id(Scope* scope);
-    int get_var_id(Scope* scope, string name);
+    pair<int, int> get_var_id(Scope* scope, string name);
     /***/
 
     void set_top_function_id(uint16_t id) {
@@ -92,7 +92,7 @@ public:
     }
 
     void set_var(LocalVar* to, LocalVar* from);
-    Status* call(int call_id);
+    Status* call(int call_id, ofstream& out);
     virtual Status* execute(vector<Var *> &vars);
     /*
      *  BC_CALL

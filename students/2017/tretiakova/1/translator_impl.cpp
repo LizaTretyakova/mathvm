@@ -53,6 +53,7 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
 
     AstFunction* top = parser->top();
     (*code) = new BytecodeCode();
+    ((BytecodeCode*)(*code))->add_scope(top->scope());
     BytecodeTranslateVisitor visitor((BytecodeCode*)(*code));
     visitor.setTopFunction(top);
     top->node()->visit(&visitor);

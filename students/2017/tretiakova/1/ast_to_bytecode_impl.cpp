@@ -19,14 +19,14 @@ using namespace std;
 
 void BytecodeTranslateVisitor::invalidate(string msg, uint32_t pos) {
 //        type_stack.pop();
-    cerr << "[Translator] invalidate INVALID";
+    cerr << "[Translator] invalidate INVALID" << endl;
     type_stack.push(VT_INVALID);
     status = Status::Error(msg.c_str(), pos);
 }
 
 VarType BytecodeTranslateVisitor::update_type_stack_un() { // check
     if(type_stack.size() < 1) {
-        cerr << "[Translator] type stack too small (<1) INVALID";
+        cerr << "[Translator] type stack too small (<1) INVALID" << endl;
         type_stack.push(VT_INVALID);
         return VT_INVALID;
     }
@@ -35,7 +35,7 @@ VarType BytecodeTranslateVisitor::update_type_stack_un() { // check
 
 VarType BytecodeTranslateVisitor::update_type_stack() {
     if(type_stack.size() < 2) {
-        cerr << "[Translator] type stack too small (<2) INVALID";
+        cerr << "[Translator] type stack too small (<2) INVALID" << endl;
         type_stack.push(VT_INVALID);
         return VT_INVALID;
     }
@@ -352,17 +352,11 @@ void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
     const AstVar* var = node->var();
     Scope* scope = var->owner();
 
-//    uint16_t scope_id = add_scope(scope);
-//    uint16_t var_id = add_var(scope, var->type(), var->name());
-
     // get the IDs if present
     int scope_id = bcode->get_scope_id(scope);
-    if(scope_id < 0) {
-        invalidate("Unexpected unregistered scope in Load", node->position());
-        return;
-    }
-    int var_id = bcode->get_var_id(scope, var->name());
-    if(var_id < 0) {
+    assert(scope_id >= 0);
+    pair<int, int> var_id = bcode->get_var_id(scope, var->name());
+    if(var_id.first < 0 || var_id.second < 0) {
         invalidate("Unexpected unregistered var in Load", node->position());
         return;
     }
@@ -388,8 +382,8 @@ void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
         break;
     }
 
-    fun_hierarchy.back().bytecode()->addUInt16(scope_id);
-    fun_hierarchy.back().bytecode()->addUInt16(var_id);
+    fun_hierarchy.back().bytecode()->addUInt16(var_id.first);
+    fun_hierarchy.back().bytecode()->addUInt16(var_id.second);
 }
 
 void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
@@ -401,11 +395,13 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
     VarType type = var->type();
 
     int scope_id = bcode->get_scope_id(scope);
-    if(scope_id < 0) {
-        invalidate("Unexpected unregistered scope in Store", node->position());
+    assert(scope_id >= 0);
+    pair<int, int> var_id = bcode->get_var_id(scope, var->name());
+    if(var_id.first < 0 || var_id.second < 0) {
+        cerr << "Unexpected unrecognized var in Store" << endl;
+        invalidate("Unrecognized var in Store", node->position());
         return;
     }
-    int var_id = bcode->add_var(scope, var->type(), var->name());
 
     if(op == tINCRSET || op == tDECRSET) {
         switch(type) {
@@ -424,12 +420,11 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
             break;
         }
 
-        fun_hierarchy.back().bytecode()->addUInt16(scope_id);
-        fun_hierarchy.back().bytecode()->addUInt16(var_id);
+        fun_hierarchy.back().bytecode()->addUInt16(var_id.first);
+        fun_hierarchy.back().bytecode()->addUInt16(var_id.second);
     } else { // set value; probably, it's the first time?
-        pair<int, int> identifier = make_pair(scope_id, var_id);
         LocalVar lvar(var->type(), var->name());
-        fun_hierarchy.back().local_vars()[identifier] = lvar;
+        (*(fun_hierarchy.back().local_vars()))[var_id] = lvar;
     }
 
     node->value()->visit(this);
@@ -453,7 +448,7 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
         push_numeric(type, BC_IADD, BC_DADD, node->position());
     }
 
-    push_store(type, scope_id, var_id, node->position());
+    push_store(type, var_id.first, var_id.second, node->position());
 }
 
 void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
@@ -586,8 +581,6 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
     cerr << "[Block] <- " << node->scope() << endl;
 
     Scope* block_scope = node->scope();
-    bcode->add_scope(block_scope);
-
     for(Scope::FunctionIterator it(block_scope); it.hasNext();) {
         AstFunction* fun = it.next();
         cerr << "**AstFunction <- " << fun->owner() << endl;
@@ -623,8 +616,8 @@ void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
     cerr << "[Function]" << node->name()
          << " <- " << node->body()->scope() << endl;
     Scope* scope = node->body()->scope();
-    uint16_t scope_id = bcode->add_scope(scope);
-
+    int scope_id = bcode->get_scope_id(scope);
+    assert(scope_id >= 0);
     for(uint32_t i = 0; i < node->parametersNumber(); i++) {
         VarType parameterType = node->parameterType(i);
         string parameterName = node->parameterName(i);
@@ -647,7 +640,7 @@ void BytecodeTranslateVisitor::visitReturnNode(ReturnNode* node) {
         VarType return_expr_type = update_type_stack_un();
         if(return_expr_type != fun_hierarchy.back().returnType()) {
             cerr << "Invalid return type; expected "
-                 << typeToName(fun_hierarchy.back().returnType()) << ", got"
+                 << typeToName(fun_hierarchy.back().returnType()) << ", got "
                  << typeToName(return_expr_type)
                  << ", position " << node->position() << endl;
             invalidate("Invalid return type", node->position());

@@ -13,33 +13,30 @@
 namespace mathvm {
 
 int BytecodeCode::get_scope_id(Scope* scope) {
+    cerr << "get scope id for " << scope << endl;
     if(!scope_map.count(scope)) {
         return -1;
     }
     return scope_map[scope];
 }
 
-int BytecodeCode::get_var_id(Scope* scope, string name) {
-    if(!var_map[scope].count(name)) {
-        return -1;
+pair<int, int> BytecodeCode::get_var_id(Scope* scope, string name) {
+    cerr << "get var id for " << name << " in " << scope << endl;
+    Scope* cur = scope;
+    while(cur && !var_map[cur].count(name)) {
+        cur = cur->parent();
     }
-    return var_map[scope][name];
-}
-
-uint16_t BytecodeCode::add_scope(Scope* scope) {
-    if(!scope_map.count(scope)) {
-        uint16_t scope_id = (uint16_t)scope_map.size();
-        scope_map[scope] = scope_id;
-        assert(scope_id == scopes.size());
-        scopes.push_back(scope);
-        var_map[scope] = VarNameMap();
-        var_by_scope.push_back(vector<LocalVar>());
-        return scope_id;
+    if(!cur) {
+        return make_pair(-1, -1);
     }
-    return scope_map[scope];
+    // (scope, var)
+    int scope_id = get_scope_id(cur);
+    assert(scope_id >= 0);
+    return make_pair(scope_id, var_map[cur][name]);
 }
 
 int BytecodeCode::add_var(Scope* scope, VarType type, string name) {
+    cerr << "add var id for " << typeToName(type) << " " << name << " in " << scope << endl;
     int scope_id = get_scope_id(scope);
     if(scope_id < 0) {
         return scope_id;
@@ -70,6 +67,33 @@ int BytecodeCode::add_var(Scope* scope, VarType type, string name) {
     return var_map[scope][name];
 }
 
+uint16_t BytecodeCode::add_scope(Scope* scope) {
+    cerr << "add scope " << scope << "{" << endl;
+    if(!scope_map.count(scope)) {
+        uint16_t scope_id = (uint16_t)scope_map.size();
+        scope_map[scope] = scope_id;
+        assert(scope_id == scopes.size());
+        scopes.push_back(scope);
+        var_map[scope] = VarNameMap();
+        var_by_scope.push_back(vector<LocalVar>());
+
+        for(int i = 0; i < (int)scope->childScopeNumber(); ++i) {
+            add_scope(scope->childScopeAt(i));
+        }
+
+        for(Scope::VarIterator it(scope); it.hasNext();) {
+            AstVar* v = it.next();
+            add_var(scope, v->type(), v->name());
+        }
+
+        cerr << "} id " << scope_id << endl;
+        return scope_id;
+    }
+
+    cerr << "}" << endl;
+    return scope_map[scope];
+}
+
 /***/
 
 void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
@@ -89,12 +113,11 @@ void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
     }
 }
 
-Status* BytecodeCode::call(int call_id) {
+Status* BytecodeCode::call(int call_id, ofstream& out) {
     Bytecode* cur = call_stack[call_id].bytecode();
     map<pair<uint16_t, uint16_t>, LocalVar>* local_vars =
             call_stack[call_id].local_vars();
-    ofstream out("debug.output");
-    cur->dump(out);
+//    ofstream out("debug.output", "a");
 
     // cannot define them in the switch-block
     Value t;
@@ -170,7 +193,7 @@ Status* BytecodeCode::call(int call_id) {
                 f = (StackFrame*)functionById(fun_id);
                 call_stack.push_back(*f);
                 stack_size = value_stack.size();
-                status = call(call_stack.size() - 1);
+                status = call(call_stack.size() - 1, out);
                 if(status->isError()) {
                     return status;
                 }
@@ -228,6 +251,7 @@ Status* BytecodeCode::call(int call_id) {
                 scope_id = cur->getUInt16(bci + 1);
                 var_id = cur->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
+                cerr << "scope_id " << scope_id << " var_id " << var_id << endl;
                 assert(local_vars->count(identifier) > 0);
                 value_stack.emplace((*local_vars)[identifier].getIntValue());
 
@@ -536,35 +560,41 @@ Status* BytecodeCode::call(int call_id) {
     return Status::Ok();
 }
 
-void BytecodeCode::print_funs() {
+void BytecodeCode::print_funs(ofstream& out) {
     int it;
     BytecodeFunction* fun;
     for(it = 0, fun = (BytecodeFunction*)functionById(it); fun != 0; ++it, fun = (BytecodeFunction*)functionById(it)) {
-        cerr << "function " << fun->name() << ": " << endl;
-        fun->bytecode()->dump(cerr);
+        out << "function " << fun->name() << ": " << endl;
+        fun->bytecode()->dump(out);
     }
 }
 
 Status* BytecodeCode::execute(vector<Var *> &vars) {
-    print_funs();
+    ofstream out("debug.output");
+    print_funs(out);
 
-    uint16_t top_scope_id = 0;
+    uint16_t top_scope_id = 1; // sic!
     StackFrame sf(*(StackFrame*)(functionById(top_function_id)));
     map<pair<uint16_t, uint16_t>, LocalVar>* global_vars = sf.local_vars();
     for(Var* var: vars) {
         LocalVar lvar = *(LocalVar*)var;
-        for(int i = 0; i < (int)var_by_scope[top_scope_id].size(); ++i) {
-            if(var_by_scope[top_scope_id][i].name()
-                    == lvar.name()) {
-                pair<uint16_t, uint16_t> identifier =
-                        make_pair((uint16_t)top_scope_id, (uint16_t)i);
-                (*global_vars)[identifier] = lvar;
-                break;
-            }
+        pair<int, int> var_id = get_var_id(scopes[top_scope_id], lvar.name());
+        if(var_id.first != -1 && var_id.second != -1) {
+            (*global_vars)[var_id] = lvar;
         }
+//        for(int i = 0; i < (int)var_by_scope[top_scope_id].size(); ++i) {
+//            if(var_by_scope[top_scope_id][i].name()
+//                    == lvar.name()) {
+//                pair<uint16_t, uint16_t> identifier =
+//                        make_pair((uint16_t)top_scope_id, (uint16_t)i);
+//                (*global_vars)[identifier] = lvar;
+//                break;
+//            }
+//        }
     }
+//    add_scope(scopes[top_scope_id]);
     call_stack.push_back(sf);
-    Status* status = call(0);
+    Status* status = call(0, out);
     return status;
 }
 
