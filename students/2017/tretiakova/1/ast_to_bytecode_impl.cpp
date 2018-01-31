@@ -192,9 +192,9 @@ void BytecodeTranslateVisitor::update_jmp(uint32_t src) {
     // -2 because the offset
 }
 
-BytecodeCode BytecodeTranslateVisitor::program() {
-    return bc;
-}
+//BytecodeCode BytecodeTranslateVisitor::program() {
+//    return bcode;
+//}
 
 Status* BytecodeTranslateVisitor::get_status() {
     return status;
@@ -323,7 +323,7 @@ void BytecodeTranslateVisitor::visitUnaryOpNode(UnaryOpNode* node) {
 void BytecodeTranslateVisitor::visitStringLiteralNode(StringLiteralNode* node) {
     cerr << "[StringLiteral]" << endl;
 
-    uint16_t const_id = bc.makeStringConstant(node->literal());
+    uint16_t const_id = bcode->makeStringConstant(node->literal());
     cerr << "const_id: " << const_id << " literal: " << node->literal() << endl;
     fun_hierarchy.back().bytecode()->addInsn(BC_SLOAD);
     fun_hierarchy.back().bytecode()->addUInt16(const_id);
@@ -356,12 +356,12 @@ void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
 //    uint16_t var_id = add_var(scope, var->type(), var->name());
 
     // get the IDs if present
-    int scope_id = bc.get_scope_id(scope);
+    int scope_id = bcode->get_scope_id(scope);
     if(scope_id < 0) {
         invalidate("Unexpected unregistered scope in Load", node->position());
         return;
     }
-    int var_id = bc.get_var_id(scope, var->name());
+    int var_id = bcode->get_var_id(scope, var->name());
     if(var_id < 0) {
         invalidate("Unexpected unregistered var in Load", node->position());
         return;
@@ -400,12 +400,12 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
     Scope* scope = var->owner();
     VarType type = var->type();
 
-    int scope_id = bc.get_scope_id(scope);
+    int scope_id = bcode->get_scope_id(scope);
     if(scope_id < 0) {
         invalidate("Unexpected unregistered scope in Store", node->position());
         return;
     }
-    int var_id = bc.add_var(scope, var->type(), var->name());
+    int var_id = bcode->add_var(scope, var->type(), var->name());
 
     if(op == tINCRSET || op == tDECRSET) {
         switch(type) {
@@ -479,12 +479,12 @@ void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
     // load to var
     const AstVar* var = node->var();
     Scope* scope = var->owner();
-    int scope_id = bc.get_scope_id(scope);
+    int scope_id = bcode->get_scope_id(scope);
     if(scope_id < 0) {
         invalidate("Unexpected unregistered scope in For", node->position());
         return;
     }
-    int var_id = bc.add_var(scope, var->type(), var->name());
+    int var_id = bcode->add_var(scope, var->type(), var->name());
 
     VarType type = var->type();
     VarType left_type = update_type_stack_un();
@@ -586,7 +586,7 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
     cerr << "[Block] <- " << node->scope() << endl;
 
     Scope* block_scope = node->scope();
-    bc.add_scope(block_scope);
+    bcode->add_scope(block_scope);
 
     for(Scope::FunctionIterator it(block_scope); it.hasNext();) {
         AstFunction* fun = it.next();
@@ -600,8 +600,8 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
         fun_hierarchy.emplace_back(fun);
         fun->node()->visit(this);
         StackFrame* sf = new StackFrame(fun_hierarchy.back());
-        uint16_t fun_id = bc.addFunction(sf);
-        bc.set_top_function_id(fun_id);
+        uint16_t fun_id = bcode->addFunction(sf);
+        bcode->set_top_function_id(fun_id);
         fun_hierarchy.pop_back();
     }
 
@@ -623,13 +623,13 @@ void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
     cerr << "[Function]" << node->name()
          << " <- " << node->body()->scope() << endl;
     Scope* scope = node->body()->scope();
-    uint16_t scope_id = bc.add_scope(scope);
+    uint16_t scope_id = bcode->add_scope(scope);
 
     for(uint32_t i = 0; i < node->parametersNumber(); i++) {
         VarType parameterType = node->parameterType(i);
         string parameterName = node->parameterName(i);
 
-        int var_id = bc.add_var(scope, parameterType, parameterName);
+        int var_id = bcode->add_var(scope, parameterType, parameterName);
         assert(var_id != -1);
         push_store(parameterType, scope_id, var_id, node->position());
     }
@@ -661,7 +661,7 @@ void BytecodeTranslateVisitor::visitCallNode(CallNode* node) {
     cerr << "[Call]" << endl;
 
     BytecodeFunction* fun =
-            (BytecodeFunction*)bc.functionByName(node->name());
+            (BytecodeFunction*)bcode->functionByName(node->name());
 
     if(node->parametersNumber() != fun->parametersNumber()) {
         cerr << "Parameters number mismatch at function " << node->name()
@@ -706,7 +706,7 @@ void BytecodeTranslateVisitor::visitNativeCallNode(NativeCallNode* node) {
     }
 
     uint16_t nat_id =
-            bc.makeNativeFunction(
+            bcode->makeNativeFunction(
                 node->nativeName(),
                 node->nativeSignature(),
                 (const void*)function_handler);

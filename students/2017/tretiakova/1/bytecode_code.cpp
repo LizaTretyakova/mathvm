@@ -91,9 +91,10 @@ void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
 
 Status* BytecodeCode::call(int call_id) {
     Bytecode* cur = call_stack[call_id].bytecode();
-    map<pair<uint16_t, uint16_t>, LocalVar>& local_vars =
+    map<pair<uint16_t, uint16_t>, LocalVar>* local_vars =
             call_stack[call_id].local_vars();
     ofstream out("debug.output");
+    cur->dump(out);
 
     // cannot define them in the switch-block
     Value t;
@@ -204,8 +205,8 @@ Status* BytecodeCode::call(int call_id) {
                 scope_id = cur->getUInt16(bci + 1);
                 var_id = cur->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
-                assert(local_vars.count(identifier) > 0);
-                value_stack.emplace(local_vars[identifier].getDoubleValue());
+                assert(local_vars->count(identifier) > 0);
+                value_stack.emplace((*local_vars)[identifier].getDoubleValue());
 
                 break;
             case BC_STORECTXDVAR:
@@ -217,7 +218,7 @@ Status* BytecodeCode::call(int call_id) {
                 identifier = make_pair(scope_id, var_id);
                 t = value_stack.top();
                 value_stack.pop();
-                local_vars[identifier].setDoubleValue(t._doubleValue);
+                (*local_vars)[identifier].setDoubleValue(t._doubleValue);
 
                 break;
             case BC_LOADCTXIVAR:
@@ -227,8 +228,8 @@ Status* BytecodeCode::call(int call_id) {
                 scope_id = cur->getUInt16(bci + 1);
                 var_id = cur->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
-                assert(local_vars.count(identifier) > 0);
-                value_stack.emplace(local_vars[identifier].getIntValue());
+                assert(local_vars->count(identifier) > 0);
+                value_stack.emplace((*local_vars)[identifier].getIntValue());
 
                 break;
             case BC_STORECTXIVAR:
@@ -240,7 +241,7 @@ Status* BytecodeCode::call(int call_id) {
                 identifier = make_pair(scope_id, var_id);
                 t = value_stack.top();
                 value_stack.pop();
-                local_vars[identifier].setIntValue(t._intValue);
+                (*local_vars)[identifier].setIntValue(t._intValue);
 
                 break;
             case BC_LOADCTXSVAR:
@@ -250,8 +251,8 @@ Status* BytecodeCode::call(int call_id) {
                 scope_id = cur->getUInt16(bci + 1);
                 var_id = cur->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
-                assert(local_vars.count(identifier) > 0);
-                value_stack.emplace(local_vars[identifier].getStringValue());
+                assert(local_vars->count(identifier) > 0);
+                value_stack.emplace((*local_vars)[identifier].getStringValue());
                 break;
             case BC_STORECTXSVAR:
                 out << name << " @" << cur->getUInt16(bci + 1)
@@ -262,7 +263,7 @@ Status* BytecodeCode::call(int call_id) {
                 identifier = make_pair(scope_id, var_id);
                 t = value_stack.top();
                 value_stack.pop();
-                local_vars[identifier].setStringValue(t._stringValue);
+                (*local_vars)[identifier].setStringValue(t._stringValue);
 
                 break;
             case BC_IFICMPNE:
@@ -548,19 +549,20 @@ Status* BytecodeCode::execute(vector<Var *> &vars) {
     print_funs();
 
     uint16_t top_scope_id = 0;
+    StackFrame sf(*(StackFrame*)(functionById(top_function_id)));
+    map<pair<uint16_t, uint16_t>, LocalVar>* global_vars = sf.local_vars();
     for(Var* var: vars) {
-        LocalVar* lvar = (LocalVar*)var;
+        LocalVar lvar = *(LocalVar*)var;
         for(int i = 0; i < (int)var_by_scope[top_scope_id].size(); ++i) {
-            LocalVar v = var_by_scope[top_scope_id][i];
-            if(v.name() != lvar->name()) {
-                continue;
+            if(var_by_scope[top_scope_id][i].name()
+                    == lvar.name()) {
+                pair<uint16_t, uint16_t> identifier =
+                        make_pair((uint16_t)top_scope_id, (uint16_t)i);
+                (*global_vars)[identifier] = lvar;
+                break;
             }
-            set_var(&var_by_scope[top_scope_id][i], lvar);
-            break;
         }
     }
-
-    StackFrame sf(*(StackFrame*)(functionById(top_function_id)));
     call_stack.push_back(sf);
     Status* status = call(0);
     return status;

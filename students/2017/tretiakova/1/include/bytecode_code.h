@@ -47,8 +47,8 @@ public:
     StackFrame(const BytecodeFunction& bf): BytecodeFunction(bf) {}
     StackFrame(AstFunction* f): BytecodeFunction(f) {}
 
-    map<pair<uint16_t, uint16_t>, LocalVar>& local_vars() {
-        return vars;
+    map<pair<uint16_t, uint16_t>, LocalVar>* local_vars() {
+        return &vars;
     }
 
     pair<int, int> lookup_local_var(AstVar* var) {

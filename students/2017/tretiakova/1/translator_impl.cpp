@@ -52,13 +52,14 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     }
 
     AstFunction* top = parser->top();
-    BytecodeTranslateVisitor visitor;
+    (*code) = new BytecodeCode();
+    BytecodeTranslateVisitor visitor((BytecodeCode*)(*code));
     visitor.setTopFunction(top);
     top->node()->visit(&visitor);
     visitor.unsetTopFunction();
     status = visitor.get_status();
-    BytecodeCode b = visitor.program();
-    (*code) = new BytecodeCode(b);
+//    BytecodeCode b = visitor.program();
+//    (*code) = new BytecodeCode(b);
 
     delete parser;
 

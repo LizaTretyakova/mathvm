@@ -26,7 +26,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     // *** visitor visits one function at a time ***
 //    VarType return_type = VT_VOID;
 
-    BytecodeCode bc;
+    BytecodeCode* bcode;
     vector<StackFrame> fun_hierarchy; // No.
     stack<VarType> type_stack;
     Status* status = Status::Ok();
@@ -37,7 +37,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void push_numeric(VarType type, Instruction i_bc, Instruction d_bc, uint32_t pos);
     void push_comparison(VarType type, Instruction i_bc, Instruction d_bc, Instruction s_bc, uint32_t pos);
     void push_condition(VarType type, Instruction comp_insn, uint32_t pos);
-    void push_logic(VarType type, Instruction bc, uint32_t pos);
+    void push_logic(VarType type, Instruction bcode, uint32_t pos);
     void push_store(VarType type, uint16_t scope_id, uint16_t var_id, uint32_t pos);
     // returns the position of the jmp's argument, 0 on error
     uint32_t push_cond_jump(uint32_t pos);
@@ -46,7 +46,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void update_jmp(uint32_t from);
 public:
 
-    BytecodeTranslateVisitor() = default;
+    BytecodeTranslateVisitor(BytecodeCode* b): bcode(b) {}
 
 //    BytecodeTranslateVisitor(BytecodeFunction* bf, BytecodeCode* bc):
 //        BytecodeTranslateVisitor() {
@@ -54,15 +54,13 @@ public:
 //        translated_code = bc;
 //    }
 
-    BytecodeTranslateVisitor(const BytecodeTranslateVisitor& b) = default;
-
 //    BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, BytecodeFunction* bf, VarType t):
 //        BytecodeTranslateVisitor(b) {
 //        translated_function = bf;
 //        return_type = t;
 //    }
 
-    BytecodeCode program();
+//    BytecodeCode program();
     Status* get_status();
     void setTopFunction(AstFunction* f) {
         fun_hierarchy.emplace_back(f);
@@ -70,8 +68,8 @@ public:
     void unsetTopFunction() {
         assert(fun_hierarchy.size() == 1);
         StackFrame* sf = new StackFrame(fun_hierarchy.back());
-        uint16_t fun_id = bc.addFunction(sf);
-        bc.set_top_function_id(fun_id);
+        uint16_t fun_id = bcode->addFunction(sf);
+        bcode->set_top_function_id(fun_id);
         fun_hierarchy.pop_back();
     }
 
