@@ -158,7 +158,7 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
         Instruction insn = call_stack[call_id].bytecode()->getInsn(bci);
         out << bci << ": ";
         const char* name = bytecodeName(insn, &length);
-//        print_value_stack(value_stack);
+        print_value_stack(value_stack);
         cerr << "[" << string(name) << "]" << endl;
         switch (insn) {
             case BC_DLOAD:
@@ -273,6 +273,8 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
                 var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
                 cerr << "scope_id " << scope_id << " var_id " << var_id << endl;
+                Value stop = value_stack.top();
+                cerr << stop._intValue();
                 assert(local_vars->count(identifier) > 0);
                 value_stack.emplace((*local_vars)[identifier].getIntValue());
 

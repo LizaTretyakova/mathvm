@@ -27,7 +27,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 //    VarType return_type = VT_VOID;
 
     BytecodeCode* bcode;
-    vector<StackFrame> fun_hierarchy; // No.
+    vector<StackFrame*> fun_hierarchy; // No.
     stack<VarType> type_stack;
     Status* status = Status::Ok();
 
@@ -44,33 +44,34 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void push_load_i(uint16_t scope_id, uint16_t var_id);
     void push_ja(uint32_t to);
     void update_jmp(uint32_t from);
+
+    void print_fun_hierarchy() {
+        cerr << "[FunHierarchy]: ";
+//        for(StackFrame* sf: fun_hierarchy) {
+        for(int i = 0; i < (int)fun_hierarchy.size(); ++i) {
+            cerr << fun_hierarchy[i]->name() << " ";
+        }
+        cerr << endl;
+    }
+
 public:
 
     BytecodeTranslateVisitor(BytecodeCode* b): bcode(b) {}
 
-//    BytecodeTranslateVisitor(BytecodeFunction* bf, BytecodeCode* bc):
-//        BytecodeTranslateVisitor() {
-//        translated_function = bf;
-//        translated_code = bc;
-//    }
-
-//    BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, BytecodeFunction* bf, VarType t):
-//        BytecodeTranslateVisitor(b) {
-//        translated_function = bf;
-//        return_type = t;
-//    }
-
-//    BytecodeCode program();
     Status* get_status();
     void setTopFunction(AstFunction* f) {
-        fun_hierarchy.emplace_back(f);
+        StackFrame* sf = new StackFrame(f);
+        fun_hierarchy.push_back(sf);
+        print_fun_hierarchy();
+
     }
     void unsetTopFunction() {
         assert(fun_hierarchy.size() == 1);
-        StackFrame* sf = new StackFrame(fun_hierarchy.back());
+        StackFrame* sf = fun_hierarchy.back();
         uint16_t fun_id = bcode->addFunction(sf);
         bcode->set_top_function_id(fun_id);
         fun_hierarchy.pop_back();
+        print_fun_hierarchy();
     }
 
     virtual void visitBinaryOpNode(BinaryOpNode* node);

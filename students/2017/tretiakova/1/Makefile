@@ -23,9 +23,7 @@ USER_OBJ = \
 include $(VM_ROOT)/common.mk
 
 INCLUDE += -I$(ROOT)/include
-MY_HEADERS = \
-   $(ROOT)/include/bytecode_code.h \
-   $(ROOT)/include/ast_to_bytecode_impl.h
+MY_HEADERS = include/bytecode_code.h include/ast_to_bytecode_impl.h
 
 MATHVM = $(BIN)/mvm
 
