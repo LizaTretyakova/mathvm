@@ -347,7 +347,7 @@ void BytecodeTranslateVisitor::visitIntLiteralNode(IntLiteralNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
-    cerr << "[Load]" << endl;
+    cerr << "[Load]" << " <- " << node->var()->owner() << endl;
 
     const AstVar* var = node->var();
     Scope* scope = var->owner();
@@ -387,7 +387,7 @@ void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
-    cerr << "[Store]" << endl;
+    cerr << "[Store]" << " <- " << node->var()->owner() << endl;
 
     TokenKind op = node->op();
     const AstVar* var = node->var();
@@ -452,7 +452,7 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
-    cerr << "[For]" << endl;
+    cerr << "[For]" << " <- " << node->var()->owner() << endl;
 
     // get and check the condition
     BinaryOpNode* range = dynamic_cast<BinaryOpNode*>(node->inExpr());
@@ -613,8 +613,7 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
-    cerr << "[Function]" << node->name()
-         << " <- " << node->body()->scope() << endl;
+    cerr << "[Function]" << endl;
     Scope* scope = node->body()->scope();
     int scope_id = bcode->get_scope_id(scope);
     assert(scope_id >= 0);
@@ -622,9 +621,9 @@ void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
         VarType parameterType = node->parameterType(i);
         string parameterName = node->parameterName(i);
 
-        int var_id = bcode->add_var(scope, parameterType, parameterName);
-        assert(var_id != -1);
-        push_store(parameterType, scope_id, var_id, node->position());
+        pair<int, int> var_id = bcode->get_var_id(scope, parameterName);
+        assert(var_id.first != -1 && var_id.second != -1);
+        push_store(parameterType, var_id.first, var_id.second, node->position());
     }
     node->body()->visit(this);
 }
@@ -682,6 +681,9 @@ void BytecodeTranslateVisitor::visitCallNode(CallNode* node) {
 
     fun_hierarchy.back().bytecode()->addInsn(BC_CALL);
     fun_hierarchy.back().bytecode()->addUInt16(fun->id());
+
+    StackFrame* tsf = (StackFrame*)bcode->functionByName(node->name());
+    type_stack.push(tsf->returnType());
 }
 
 void BytecodeTranslateVisitor::visitNativeCallNode(NativeCallNode* node) {

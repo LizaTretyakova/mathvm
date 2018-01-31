@@ -86,6 +86,11 @@ uint16_t BytecodeCode::add_scope(Scope* scope) {
             add_var(scope, v->type(), v->name());
         }
 
+        for(Scope::FunctionIterator fit(scope); fit.hasNext();) {
+            AstFunction* f = fit.next();
+            cerr << "function " << f->name() << endl;
+        }
+
         cerr << "} id " << scope_id << endl;
         return scope_id;
     }
@@ -113,12 +118,23 @@ void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
     }
 }
 
+void print_value_stack(const stack<Value>& s) {
+    const Value* end   = &s.top() + 1;
+    const Value* begin = end - s.size();
+    std::vector<Value> stack_contents(begin, end);
+    cerr << "Value stack [beginning --> end]: ";
+    for(Value v: stack_contents) {
+        cerr << "(" << v._doubleValue << ", " << v._intValue << ", " << v._stringValue << ") ";
+    }
+    cerr << endl;
+}
+
 Status* BytecodeCode::call(int call_id, ofstream& out) {
-    Bytecode* cur = call_stack[call_id].bytecode();
+//    Bytecode* cur = call_stack[call_id].bytecode();
     map<pair<uint16_t, uint16_t>, LocalVar>* local_vars =
             call_stack[call_id].local_vars();
 //    ofstream out("debug.output", "a");
-
+    out << endl;
     // cannot define them in the switch-block
     Value t;
     Value b;
@@ -135,23 +151,27 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
     int diff;
     pair<uint16_t, uint16_t> identifier;
 
-    for (size_t bci = 0; bci < cur->length();) {
+    for (size_t bci = 0; bci < call_stack[call_id].bytecode()->length();) {
+//        print_value_stack(value_stack);
+
         size_t length;
-        Instruction insn = cur->getInsn(bci);
+        Instruction insn = call_stack[call_id].bytecode()->getInsn(bci);
         out << bci << ": ";
         const char* name = bytecodeName(insn, &length);
+//        print_value_stack(value_stack);
+        cerr << "[" << string(name) << "]" << endl;
         switch (insn) {
             case BC_DLOAD:
-                out << name << " " << cur->getDouble(bci + 1);
+                out << name << " " << call_stack[call_id].bytecode()->getDouble(bci + 1);
 
-                dval = cur->getDouble(bci + 1);
+                dval = call_stack[call_id].bytecode()->getDouble(bci + 1);
                 value_stack.emplace(dval);
 
                 break;
             case BC_ILOAD:
-                out << name << " " << cur->getInt64(bci + 1);
+                out << name << " " << call_stack[call_id].bytecode()->getInt64(bci + 1);
 
-                ival = cur->getInt64(bci + 1);
+                ival = call_stack[call_id].bytecode()->getInt64(bci + 1);
                 value_stack.emplace(ival);
 
                 break;
@@ -180,16 +200,16 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
                 break;
             case BC_SLOAD:
-                out << name << " @" << cur->getUInt16(bci + 1);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 
-                sid = cur->getUInt16(bci + 1);
+                sid = call_stack[call_id].bytecode()->getUInt16(bci + 1);
                 value_stack.emplace(constantById(sid));
 
                 break;
             case BC_CALL:
-                out << name << " *" << cur->getUInt16(bci + 1);
+                out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 
-                fun_id = cur->getUInt16(bci + 1);
+                fun_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
                 f = (StackFrame*)functionById(fun_id);
                 call_stack.push_back(*f);
                 stack_size = value_stack.size();
@@ -211,7 +231,7 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
                 break;
             case BC_CALLNATIVE:
-                out << name << " *" << cur->getUInt16(bci + 1);
+                out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
                 break;
             case BC_LOADDVAR:
             case BC_STOREDVAR:
@@ -219,37 +239,38 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             case BC_STOREIVAR:
             case BC_LOADSVAR:
             case BC_STORESVAR:
-                out << name << " @" << cur->getUInt16(bci + 1);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
                 break;
             case BC_LOADCTXDVAR:
-                out << name << " @" << cur->getUInt16(bci + 1)
-                    << ":" << cur->getUInt16(bci + 3);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
-                scope_id = cur->getUInt16(bci + 1);
-                var_id = cur->getUInt16(bci + 3);
+                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
                 assert(local_vars->count(identifier) > 0);
                 value_stack.emplace((*local_vars)[identifier].getDoubleValue());
 
                 break;
             case BC_STORECTXDVAR:
-                out << name << " @" << cur->getUInt16(bci + 1)
-                    << ":" << cur->getUInt16(bci + 3);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
-                scope_id = cur->getUInt16(bci + 1);
-                var_id = cur->getUInt16(bci + 3);
+                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
                 t = value_stack.top();
                 value_stack.pop();
+                (*local_vars)[identifier] = var_by_scope[scope_id][var_id];
                 (*local_vars)[identifier].setDoubleValue(t._doubleValue);
 
                 break;
             case BC_LOADCTXIVAR:
-                out << name << " @" << cur->getUInt16(bci + 1)
-                    << ":" << cur->getUInt16(bci + 3);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
-                scope_id = cur->getUInt16(bci + 1);
-                var_id = cur->getUInt16(bci + 3);
+                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
                 cerr << "scope_id " << scope_id << " var_id " << var_id << endl;
                 assert(local_vars->count(identifier) > 0);
@@ -257,121 +278,123 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
                 break;
             case BC_STORECTXIVAR:
-                out << name << " @" << cur->getUInt16(bci + 1)
-                    << ":" << cur->getUInt16(bci + 3);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
-                scope_id = cur->getUInt16(bci + 1);
-                var_id = cur->getUInt16(bci + 3);
+                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
                 t = value_stack.top();
                 value_stack.pop();
+                (*local_vars)[identifier] = var_by_scope[scope_id][var_id];
                 (*local_vars)[identifier].setIntValue(t._intValue);
 
                 break;
             case BC_LOADCTXSVAR:
-                out << name << " @" << cur->getUInt16(bci + 1)
-                    << ":" << cur->getUInt16(bci + 3);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
-                scope_id = cur->getUInt16(bci + 1);
-                var_id = cur->getUInt16(bci + 3);
+                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
                 assert(local_vars->count(identifier) > 0);
                 value_stack.emplace((*local_vars)[identifier].getStringValue());
                 break;
             case BC_STORECTXSVAR:
-                out << name << " @" << cur->getUInt16(bci + 1)
-                    << ":" << cur->getUInt16(bci + 3);
+                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
-                scope_id = cur->getUInt16(bci + 1);
-                var_id = cur->getUInt16(bci + 3);
+                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
                 t = value_stack.top();
                 value_stack.pop();
+                (*local_vars)[identifier] = var_by_scope[scope_id][var_id];
                 (*local_vars)[identifier].setStringValue(t._stringValue);
 
                 break;
             case BC_IFICMPNE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
+                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                offset = cur->getInt16(bci + 1);
+                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
                 if(t._intValue != b._intValue) {
                     bci += offset;
                 }
 
                 break;
             case BC_IFICMPE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
+                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                offset = cur->getInt16(bci + 1);
+                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
                 if(t._intValue == b._intValue) {
                     bci += offset;
                 }
 
                 break;
             case BC_IFICMPG:
-                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
+                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                offset = cur->getInt16(bci + 1);
+                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
                 if(t._intValue > b._intValue) {
                     bci += offset;
                 }
 
                 break;
             case BC_IFICMPGE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
+                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                offset = cur->getInt16(bci + 1);
+                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
                 if(t._intValue >= b._intValue) {
                     bci += offset;
                 }
 
                 break;
             case BC_IFICMPL:
-                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
+                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                offset = cur->getInt16(bci + 1);
+                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
                 if(t._intValue < b._intValue) {
                     bci += offset;
                 }
 
                 break;
             case BC_IFICMPLE:
-                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
+                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
                 t = value_stack.top();
                 value_stack.pop();
                 b = value_stack.top();
                 value_stack.pop();
-                offset = cur->getInt16(bci + 1);
+                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
                 if(t._intValue <= b._intValue) {
                     bci += offset;
                 }
 
                 break;
             case BC_JA:
-                out << name << " " << cur->getInt16(bci + 1) + bci + length;// + 1;
+                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
-                offset = cur->getInt16(bci + 1);
+                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
                 bci += offset;
 
                 break;
