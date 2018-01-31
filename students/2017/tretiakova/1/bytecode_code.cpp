@@ -558,10 +558,8 @@ Status* BytecodeCode::execute(vector<Var *> &vars) {
             set_var(&var_by_scope[top_scope_id][i], lvar);
             break;
         }
-
     }
 
-//    call_stack.push_back(translated_function->bytecode());
     StackFrame sf(*(StackFrame*)(functionById(top_function_id)));
     call_stack.push_back(sf);
     Status* status = call(0);

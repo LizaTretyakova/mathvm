@@ -57,7 +57,8 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     top->node()->visit(&visitor);
     visitor.unsetTopFunction();
     status = visitor.get_status();
-    (*code) = new BytecodeCode(visitor.program());
+    BytecodeCode b = visitor.program();
+    (*code) = new BytecodeCode(b);
 
     delete parser;
 
