@@ -20,11 +20,14 @@ using namespace std;
 typedef void* (*dl_fun_ptr)();
 
 class BytecodeTranslateVisitor : public AstBaseVisitor {
-    BytecodeCode* translated_code = NULL;
-    BytecodeFunction* translated_function = NULL;
+//    BytecodeCode* translated_code = NULL;
+//    BytecodeFunction* translated_function = NULL;
     // The default value. It's here due to invariant that
     // *** visitor visits one function at a time ***
-    VarType return_type = VT_VOID;
+//    VarType return_type = VT_VOID;
+
+    BytecodeCode bc;
+    vector<StackFrame> fun_hierarchy; // No.
     stack<VarType> type_stack;
     Status* status = Status::Ok();
 
@@ -41,28 +44,36 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void push_load_i(uint16_t scope_id, uint16_t var_id);
     void push_ja(uint32_t to);
     void update_jmp(uint32_t from);
-    uint16_t add_scope(Scope* scope);
-    uint16_t add_var(Scope* scope, VarType type, string name);
 public:
 
     BytecodeTranslateVisitor() = default;
 
-    BytecodeTranslateVisitor(BytecodeFunction* bf, BytecodeCode* bc):
-        BytecodeTranslateVisitor() {
-        translated_function = bf;
-        translated_code = bc;
-    }
+//    BytecodeTranslateVisitor(BytecodeFunction* bf, BytecodeCode* bc):
+//        BytecodeTranslateVisitor() {
+//        translated_function = bf;
+//        translated_code = bc;
+//    }
 
     BytecodeTranslateVisitor(const BytecodeTranslateVisitor& b) = default;
 
-    BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, BytecodeFunction* bf, VarType t):
-        BytecodeTranslateVisitor(b) {
-        translated_function = bf;
-        return_type = t;
-    }
+//    BytecodeTranslateVisitor(const BytecodeTranslateVisitor &b, BytecodeFunction* bf, VarType t):
+//        BytecodeTranslateVisitor(b) {
+//        translated_function = bf;
+//        return_type = t;
+//    }
 
-    BytecodeCode* program();
+    BytecodeCode program();
     Status* get_status();
+    void setTopFunction(AstFunction* f) {
+        fun_hierarchy.emplace_back(f);
+    }
+    void unsetTopFunction() {
+        assert(fun_hierarchy.size() == 1);
+        StackFrame* sf = new StackFrame(fun_hierarchy.back());
+        uint16_t fun_id = bc.addFunction(sf);
+        bc.set_top_function_id(fun_id);
+        fun_hierarchy.pop_back();
+    }
 
     virtual void visitBinaryOpNode(BinaryOpNode* node);
     virtual void visitUnaryOpNode(UnaryOpNode* node);

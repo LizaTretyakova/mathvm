@@ -9,6 +9,7 @@
 #include <vector>
 #include <stack>
 #include <map>
+#include <memory>
 #include <string>
 #include <dlfcn.h>
 
@@ -66,10 +67,10 @@ VarType BytecodeTranslateVisitor::update_type_stack() {
 void BytecodeTranslateVisitor::push_numeric(VarType type, Instruction i_bc, Instruction d_bc, uint32_t pos) {
     switch(type) {
     case VT_INT:
-        translated_function->bytecode()->addInsn(i_bc);
+        fun_hierarchy.back().bytecode()->addInsn(i_bc);
         break;
     case VT_DOUBLE:
-        translated_function->bytecode()->addInsn(d_bc);
+        fun_hierarchy.back().bytecode()->addInsn(d_bc);
         break;
     default:
         cerr << "Invalid operand type in numeric op" << endl;
@@ -84,13 +85,13 @@ void BytecodeTranslateVisitor::push_comparison(VarType type, Instruction i_bc, I
 
     switch(type) {
     case VT_INT:
-        translated_function->bytecode()->addInsn(i_bc);
+        fun_hierarchy.back().bytecode()->addInsn(i_bc);
         break;
     case VT_DOUBLE:
-        translated_function->bytecode()->addInsn(d_bc);
+        fun_hierarchy.back().bytecode()->addInsn(d_bc);
         break;
     case VT_STRING:
-        translated_function->bytecode()->addInsn(s_bc);
+        fun_hierarchy.back().bytecode()->addInsn(s_bc);
         break;
     default:
         cerr << "Invalid type in comparison" << endl;
@@ -104,12 +105,12 @@ void BytecodeTranslateVisitor::push_condition(VarType type, Instruction comp_ins
     type_stack.push(VT_INT);
     // what we leave after comparison
 
-    translated_function->bytecode()->addInsn(comp_insn);
-    translated_function->bytecode()->addInt16(2 + 2); // if true, goto load1
-    translated_function->bytecode()->addInsn(BC_ILOAD0);
-    translated_function->bytecode()->addInsn(BC_JA);
-    translated_function->bytecode()->addInt16(1);
-    translated_function->bytecode()->addInsn(BC_ILOAD1);
+    fun_hierarchy.back().bytecode()->addInsn(comp_insn);
+    fun_hierarchy.back().bytecode()->addInt16(2 + 2); // if true, goto load1
+    fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD0);
+    fun_hierarchy.back().bytecode()->addInsn(BC_JA);
+    fun_hierarchy.back().bytecode()->addInt16(1);
+    fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD1);
 }
 
 void BytecodeTranslateVisitor::push_logic(VarType type, Instruction bc, uint32_t pos) {
@@ -118,30 +119,19 @@ void BytecodeTranslateVisitor::push_logic(VarType type, Instruction bc, uint32_t
         invalidate("Non-int type in logic", pos);
         return;
     }
-    translated_function->bytecode()->addInsn(bc);
+    fun_hierarchy.back().bytecode()->addInsn(bc);
 }
 
 void BytecodeTranslateVisitor::push_store(VarType type, uint16_t scope_id, uint16_t var_id, uint32_t pos) {
-//    VarType last_type = update_type_stack_un();
-//    if(last_type != type) {
-//        cerr << "Type mismatch in STORE, expected " << typeToName(last_type)
-//             << ", got " << typeToName(type) << endl;
-//        invalidate("Type mismatch in STORE", pos);
-//        return;
-//    }
-
-//    // because STORE will take one value from stack
-//    type_stack.pop();
-
     switch(type) {
     case VT_INT:
-        translated_function->bytecode()->addInsn(BC_STORECTXIVAR);
+        fun_hierarchy.back().bytecode()->addInsn(BC_STORECTXIVAR);
         break;
     case VT_DOUBLE:
-        translated_function->bytecode()->addInsn(BC_STORECTXDVAR);
+        fun_hierarchy.back().bytecode()->addInsn(BC_STORECTXDVAR);
         break;
     case VT_STRING:
-        translated_function->bytecode()->addInsn(BC_STORECTXSVAR);
+        fun_hierarchy.back().bytecode()->addInsn(BC_STORECTXSVAR);
         break;
     default:
         cerr << "Unexpected type " << typeToName(type) << " in STORE" << endl;
@@ -149,8 +139,8 @@ void BytecodeTranslateVisitor::push_store(VarType type, uint16_t scope_id, uint1
         break;
     }
 
-    translated_function->bytecode()->addUInt16(scope_id);
-    translated_function->bytecode()->addUInt16(var_id);
+    fun_hierarchy.back().bytecode()->addUInt16(scope_id);
+    fun_hierarchy.back().bytecode()->addUInt16(var_id);
 
     return;
 }
@@ -169,9 +159,9 @@ uint32_t BytecodeTranslateVisitor::push_cond_jump(uint32_t pos) {
     type_stack.pop();
     if(type_zero == VT_INT && type_expr == VT_INT) {
         // if `cond == 0`, i.e. false -- jump to "after block"
-        translated_function->bytecode()->addInsn(BC_IFICMPE);
-        translated_function->bytecode()->addInt16(0); // temporarily
-        uint32_t index = translated_function->bytecode()->current();
+        fun_hierarchy.back().bytecode()->addInsn(BC_IFICMPE);
+        fun_hierarchy.back().bytecode()->addInt16(0); // temporarily
+        uint32_t index = fun_hierarchy.back().bytecode()->current();
         return index;
     }
 
@@ -182,37 +172,28 @@ uint32_t BytecodeTranslateVisitor::push_cond_jump(uint32_t pos) {
 }
 
 void BytecodeTranslateVisitor::push_load_i(uint16_t scope_id, uint16_t var_id) {
-    translated_function->bytecode()->addInsn(BC_LOADCTXIVAR);
-    translated_function->bytecode()->addUInt16(scope_id);
-    translated_function->bytecode()->addUInt16(var_id);
+    fun_hierarchy.back().bytecode()->addInsn(BC_LOADCTXIVAR);
+    fun_hierarchy.back().bytecode()->addUInt16(scope_id);
+    fun_hierarchy.back().bytecode()->addUInt16(var_id);
     type_stack.push(VT_INT);
 }
 
 void BytecodeTranslateVisitor::push_ja(uint32_t to) {
-    uint32_t from = translated_function->bytecode()->current() + 3;
+    uint32_t from = fun_hierarchy.back().bytecode()->current() + 3;
     uint32_t offset = to - from;
-    translated_function->bytecode()->addInsn(BC_JA);
-    translated_function->bytecode()->addInt16((int16_t)offset);
+    fun_hierarchy.back().bytecode()->addInsn(BC_JA);
+    fun_hierarchy.back().bytecode()->addInt16((int16_t)offset);
 }
 
 void BytecodeTranslateVisitor::update_jmp(uint32_t src) {
-    uint32_t cur = translated_function->bytecode()->current();
+    uint32_t cur = fun_hierarchy.back().bytecode()->current();
     uint32_t offset = cur - src;
-    translated_function->bytecode()->setInt16(src - 2, (int16_t)offset);
+    fun_hierarchy.back().bytecode()->setInt16(src - 2, (int16_t)offset);
     // -2 because the offset
 }
 
-uint16_t BytecodeTranslateVisitor::add_scope(Scope* scope) {
-    return translated_code->add_scope(scope);
-}
-
-uint16_t BytecodeTranslateVisitor::add_var(Scope* scope, VarType type, string name) {
-    return translated_code->add_var(scope, type, name);
-}
-
-BytecodeCode* BytecodeTranslateVisitor::program() {
-    translated_code->set_translated_function(translated_function);
-    return translated_code;
+BytecodeCode BytecodeTranslateVisitor::program() {
+    return bc;
 }
 
 Status* BytecodeTranslateVisitor::get_status() {
@@ -281,7 +262,7 @@ void BytecodeTranslateVisitor::visitBinaryOpNode(BinaryOpNode* node) {
         break;
     case tMOD:
         if(type == VT_INT) {
-            translated_function->bytecode()->addInsn(BC_IMOD);
+            fun_hierarchy.back().bytecode()->addInsn(BC_IMOD);
             break;
         }
     default:
@@ -313,17 +294,17 @@ void BytecodeTranslateVisitor::visitUnaryOpNode(UnaryOpNode* node) {
             invalidate("Non-int operand in tNOT", node->position());
             break;
         }
-        // translated_function->bytecode()->addInsn(BC_ICMP);
+        // fun_hierarchy.back().bytecode()->addInsn(BC_ICMP);
 
-        translated_function->bytecode()->addInsn(BC_ILOAD0);
+        fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD0);
         // pushed int
-        translated_function->bytecode()->addInsn(BC_IFICMPE);
+        fun_hierarchy.back().bytecode()->addInsn(BC_IFICMPE);
         // removed 2 x ints and pushed one -- bal 0
-        translated_function->bytecode()->addInt16(4);
-        translated_function->bytecode()->addInsn(BC_ILOAD0);
-        translated_function->bytecode()->addInsn(BC_JA);
-        translated_function->bytecode()->addInt16(1);
-        translated_function->bytecode()->addInsn(BC_ILOAD1);
+        fun_hierarchy.back().bytecode()->addInt16(4);
+        fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD0);
+        fun_hierarchy.back().bytecode()->addInsn(BC_JA);
+        fun_hierarchy.back().bytecode()->addInt16(1);
+        fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD1);
         // after all, pushed one
         type_stack.push(VT_INT);
 
@@ -342,26 +323,26 @@ void BytecodeTranslateVisitor::visitUnaryOpNode(UnaryOpNode* node) {
 void BytecodeTranslateVisitor::visitStringLiteralNode(StringLiteralNode* node) {
     cerr << "[StringLiteral]" << endl;
 
-    uint16_t const_id = translated_code->makeStringConstant(node->literal());
+    uint16_t const_id = bc.makeStringConstant(node->literal());
     cerr << "const_id: " << const_id << " literal: " << node->literal() << endl;
-    translated_function->bytecode()->addInsn(BC_SLOAD);
-    translated_function->bytecode()->addUInt16(const_id);
+    fun_hierarchy.back().bytecode()->addInsn(BC_SLOAD);
+    fun_hierarchy.back().bytecode()->addUInt16(const_id);
     type_stack.push(VT_STRING);
 }
 
 void BytecodeTranslateVisitor::visitDoubleLiteralNode(DoubleLiteralNode* node) {
     cerr << "[DoubleLiteral]" << endl;
 
-    translated_function->bytecode()->addInsn(BC_DLOAD);
-    translated_function->bytecode()->addDouble(node->literal());
+    fun_hierarchy.back().bytecode()->addInsn(BC_DLOAD);
+    fun_hierarchy.back().bytecode()->addDouble(node->literal());
     type_stack.push(VT_DOUBLE);
 }
 
 void BytecodeTranslateVisitor::visitIntLiteralNode(IntLiteralNode* node) {
     cerr << "[IntLiteral]" << endl;
 
-    translated_function->bytecode()->addInsn(BC_ILOAD);
-    translated_function->bytecode()->addInt64(node->literal());
+    fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD);
+    fun_hierarchy.back().bytecode()->addInt64(node->literal());
     type_stack.push(VT_INT);
 }
 
@@ -370,21 +351,34 @@ void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
 
     const AstVar* var = node->var();
     Scope* scope = var->owner();
-    uint16_t scope_id = add_scope(scope);
-    uint16_t var_id = add_var(scope, var->type(), var->name());
+
+//    uint16_t scope_id = add_scope(scope);
+//    uint16_t var_id = add_var(scope, var->type(), var->name());
+
+    // get the IDs if present
+    int scope_id = bc.get_scope_id(scope);
+    if(scope_id < 0) {
+        invalidate("Unexpected unregistered scope in Load", node->position());
+        return;
+    }
+    int var_id = bc.get_var_id(scope, var->name());
+    if(var_id < 0) {
+        invalidate("Unexpected unregistered var in Load", node->position());
+        return;
+    }
 
     VarType type = var->type();
     switch(type) {
     case VT_INT:
-        translated_function->bytecode()->addInsn(BC_LOADCTXIVAR);
+        fun_hierarchy.back().bytecode()->addInsn(BC_LOADCTXIVAR);
         type_stack.push(VT_INT);
         break;
     case VT_DOUBLE:
-        translated_function->bytecode()->addInsn(BC_LOADCTXDVAR);
+        fun_hierarchy.back().bytecode()->addInsn(BC_LOADCTXDVAR);
         type_stack.push(VT_DOUBLE);
         break;
     case VT_STRING:
-        translated_function->bytecode()->addInsn(BC_LOADCTXSVAR);
+        fun_hierarchy.back().bytecode()->addInsn(BC_LOADCTXSVAR);
         type_stack.push(VT_STRING);
         break;
     default:
@@ -394,8 +388,8 @@ void BytecodeTranslateVisitor::visitLoadNode(LoadNode* node) {
         break;
     }
 
-    translated_function->bytecode()->addUInt16(scope_id);
-    translated_function->bytecode()->addUInt16(var_id);
+    fun_hierarchy.back().bytecode()->addUInt16(scope_id);
+    fun_hierarchy.back().bytecode()->addUInt16(var_id);
 }
 
 void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
@@ -406,17 +400,21 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
     Scope* scope = var->owner();
     VarType type = var->type();
 
-    uint16_t scope_id = add_scope(scope);
-    uint16_t var_id = add_var(scope, var->type(), var->name());
+    int scope_id = bc.get_scope_id(scope);
+    if(scope_id < 0) {
+        invalidate("Unexpected unregistered scope in Store", node->position());
+        return;
+    }
+    int var_id = bc.add_var(scope, var->type(), var->name());
 
     if(op == tINCRSET || op == tDECRSET) {
         switch(type) {
         case VT_INT:
-            translated_function->bytecode()->addInsn(BC_LOADCTXIVAR);
+            fun_hierarchy.back().bytecode()->addInsn(BC_LOADCTXIVAR);
             type_stack.push(VT_INT);
             break;
         case VT_DOUBLE:
-            translated_function->bytecode()->addInsn(BC_LOADCTXDVAR);
+            fun_hierarchy.back().bytecode()->addInsn(BC_LOADCTXDVAR);
             type_stack.push(VT_DOUBLE);
             break;
         default:
@@ -426,8 +424,12 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
             break;
         }
 
-        translated_function->bytecode()->addUInt16(scope_id);
-        translated_function->bytecode()->addUInt16(var_id);
+        fun_hierarchy.back().bytecode()->addUInt16(scope_id);
+        fun_hierarchy.back().bytecode()->addUInt16(var_id);
+    } else { // set value; probably, it's the first time?
+        pair<int, int> identifier = make_pair(scope_id, var_id);
+        LocalVar lvar(var->type(), var->name());
+        fun_hierarchy.back().local_vars()[identifier] = lvar;
     }
 
     node->value()->visit(this);
@@ -437,11 +439,11 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
     } else if(op == tDECRSET) {
         switch(type) {
         case VT_INT:
-            translated_function->bytecode()->addInsn(BC_ILOAD0);
+            fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD0);
             type_stack.push(VT_INT);
             break;
         case VT_DOUBLE:
-            translated_function->bytecode()->addInsn(BC_DLOAD0);
+            fun_hierarchy.back().bytecode()->addInsn(BC_DLOAD0);
             type_stack.push(VT_DOUBLE);
             break;
         default:
@@ -477,8 +479,12 @@ void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
     // load to var
     const AstVar* var = node->var();
     Scope* scope = var->owner();
-    uint16_t scope_id = add_scope(scope);
-    uint16_t var_id = add_var(scope, var->type(), var->name());
+    int scope_id = bc.get_scope_id(scope);
+    if(scope_id < 0) {
+        invalidate("Unexpected unregistered scope in For", node->position());
+        return;
+    }
+    int var_id = bc.add_var(scope, var->type(), var->name());
 
     VarType type = var->type();
     VarType left_type = update_type_stack_un();
@@ -490,7 +496,7 @@ void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
     type_stack.pop();
 
     push_store(type, scope_id, var_id, node->position());
-    uint32_t to_cond_pos = translated_function->bytecode()->current();
+    uint32_t to_cond_pos = fun_hierarchy.back().bytecode()->current();
 
     // make condtion
     push_load_i(scope_id, var_id);
@@ -503,17 +509,17 @@ void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
     }
 
     // set jump
-    translated_function->bytecode()->addInsn(BC_IFICMPL); // it needs to be false to step out of the loop
-    translated_function->bytecode()->addInt16(0);
-    uint32_t cond_checked_pos= translated_function->bytecode()->current();
+    fun_hierarchy.back().bytecode()->addInsn(BC_IFICMPL); // it needs to be false to step out of the loop
+    fun_hierarchy.back().bytecode()->addInt16(0);
+    uint32_t cond_checked_pos= fun_hierarchy.back().bytecode()->current();
 
     // loop body
     node->body()->visit(this);
 
     // set incr
     push_load_i(scope_id, var_id);
-    translated_function->bytecode()->addInsn(BC_ILOAD1);
-    translated_function->bytecode()->addInsn(BC_IADD);
+    fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD1);
+    fun_hierarchy.back().bytecode()->addInsn(BC_IADD);
     push_store(type, scope_id, var_id, node->position());
 
     // jump
@@ -524,11 +530,11 @@ void BytecodeTranslateVisitor::visitForNode(ForNode* node) {
 void BytecodeTranslateVisitor::visitWhileNode(WhileNode* node) {
     cerr << "[While]" << endl;
 
-    uint32_t to_cond_pos = translated_function->bytecode()->current();
+    uint32_t to_cond_pos = fun_hierarchy.back().bytecode()->current();
     // right!
 
     node->whileExpr()->visit(this);
-    translated_function->bytecode()->addInsn(BC_ILOAD0);
+    fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD0);
     type_stack.push(VT_INT);
     uint32_t cond_checked_pos = push_cond_jump(node->position());
 
@@ -542,34 +548,34 @@ void BytecodeTranslateVisitor::visitIfNode(IfNode* node) {
 
     // If...
     node->ifExpr()->visit(this);
-    translated_function->bytecode()->addInsn(BC_ILOAD0);
+    fun_hierarchy.back().bytecode()->addInsn(BC_ILOAD0);
     type_stack.push(VT_INT);
     uint32_t first_jmp_pos = push_cond_jump(node->position());
 
     // ... then ...
     node->thenBlock()->visit(this);
-    uint32_t after_then_pos = translated_function->bytecode()->current();
+    uint32_t after_then_pos = fun_hierarchy.back().bytecode()->current();
     uint32_t offset = after_then_pos - first_jmp_pos;
-    translated_function->bytecode()->setInt16(first_jmp_pos - 2, (int16_t)offset);
+    fun_hierarchy.back().bytecode()->setInt16(first_jmp_pos - 2, (int16_t)offset);
     // this offset is for the no-else-block case only!!!
 
     // ... else
     if(node->elseBlock()) {
-        translated_function->bytecode()->addInsn(BC_JA);
-        translated_function->bytecode()->addInt16(0);
-        uint32_t second_jmp_pos = translated_function->bytecode()->current();
+        fun_hierarchy.back().bytecode()->addInsn(BC_JA);
+        fun_hierarchy.back().bytecode()->addInt16(0);
+        uint32_t second_jmp_pos = fun_hierarchy.back().bytecode()->current();
         assert(second_jmp_pos == after_then_pos + 3);
 
         // correct the first jump offset by 3 bytes from JA
         offset = second_jmp_pos - first_jmp_pos;
-        translated_function->bytecode()->setInt16(first_jmp_pos - 2, (int16_t)offset);
+        fun_hierarchy.back().bytecode()->setInt16(first_jmp_pos - 2, (int16_t)offset);
 
         node->elseBlock()->visit(this);
 
-        uint32_t after_else_pos = translated_function->bytecode()->current();
+        uint32_t after_else_pos = fun_hierarchy.back().bytecode()->current();
         uint32_t offset2 = after_else_pos - second_jmp_pos;
 
-        translated_function->bytecode()->setInt16(second_jmp_pos - 2, offset2);
+        fun_hierarchy.back().bytecode()->setInt16(second_jmp_pos - 2, offset2);
         // again, -2 because `pos` point to the first block
         // after the JA offset, the JA offset takes 2 bytes
         // ==> (`pos` - 2) is the pos of the offset itself
@@ -577,26 +583,35 @@ void BytecodeTranslateVisitor::visitIfNode(IfNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
-    cerr << "[Block]" << endl;
+    cerr << "[Block] <- " << node->scope() << endl;
 
     Scope* block_scope = node->scope();
-    add_scope(block_scope);
+    bc.add_scope(block_scope);
 
     for(Scope::FunctionIterator it(block_scope); it.hasNext();) {
         AstFunction* fun = it.next();
-        BytecodeFunction* bf = new BytecodeFunction(fun);
-        BytecodeTranslateVisitor funVisitor(*this, bf, fun->node()->returnType());
-        fun->node()->visit(&funVisitor);
+        cerr << "**AstFunction <- " << fun->owner() << endl;
+//        BytecodeFunction* bf = new BytecodeFunction(fun);
+//        BytecodeTranslateVisitor funVisitor(*this, bf, fun->node()->returnType());
+//        fun->node()->visit(&funVisitor);
 
-        translated_code->addFunction(bf);
+//        translated_code->addFunction(bf);
+
+        fun_hierarchy.emplace_back(fun);
+        fun->node()->visit(this);
+        StackFrame* sf = new StackFrame(fun_hierarchy.back());
+        uint16_t fun_id = bc.addFunction(sf);
+        bc.set_top_function_id(fun_id);
+        fun_hierarchy.pop_back();
     }
 
     for(Scope::VarIterator it(block_scope); it.hasNext();) {
         AstVar* var = it.next();
-        Scope* scope = var->owner();
-        uint16_t scope_id = add_scope(scope);
-        uint16_t var_id = add_var(scope, var->type(), var->name());
-        push_store(var->type(), scope_id, var_id, node->position());
+        cerr << "**AstVar <- " << var->owner() << endl;
+//        Scope* scope = var->owner();
+//        uint16_t scope_id = add_scope(scope);
+//        uint16_t var_id = add_var(scope, var->type(), var->name());
+//        push_store(var->type(), scope_id, var_id, node->position());
     }
 
     for (uint32_t i = 0; i < node->nodes(); i++) {
@@ -605,7 +620,19 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
-    cerr << "[Function]" << node->name() << endl;
+    cerr << "[Function]" << node->name()
+         << " <- " << node->body()->scope() << endl;
+    Scope* scope = node->body()->scope();
+    uint16_t scope_id = bc.add_scope(scope);
+
+    for(uint32_t i = 0; i < node->parametersNumber(); i++) {
+        VarType parameterType = node->parameterType(i);
+        string parameterName = node->parameterName(i);
+
+        int var_id = bc.add_var(scope, parameterType, parameterName);
+        assert(var_id != -1);
+        push_store(parameterType, scope_id, var_id, node->position());
+    }
     node->body()->visit(this);
 }
 
@@ -618,23 +645,23 @@ void BytecodeTranslateVisitor::visitReturnNode(ReturnNode* node) {
 
         // check for the correct return type
         VarType return_expr_type = update_type_stack_un();
-        if(return_expr_type != return_type) {
+        if(return_expr_type != fun_hierarchy.back().returnType()) {
             cerr << "Invalid return type; expected "
-                 << typeToName(return_type) << ", got"
+                 << typeToName(fun_hierarchy.back().returnType()) << ", got"
                  << typeToName(return_expr_type)
                  << ", position " << node->position() << endl;
             invalidate("Invalid return type", node->position());
             return;
         }
     }
-    translated_function->bytecode()->addInsn(BC_RETURN);
+    fun_hierarchy.back().bytecode()->addInsn(BC_RETURN);
 }
 
 void BytecodeTranslateVisitor::visitCallNode(CallNode* node) {
     cerr << "[Call]" << endl;
 
     BytecodeFunction* fun =
-            (BytecodeFunction*)translated_code->functionByName(node->name());
+            (BytecodeFunction*)bc.functionByName(node->name());
 
     if(node->parametersNumber() != fun->parametersNumber()) {
         cerr << "Parameters number mismatch at function " << node->name()
@@ -660,8 +687,8 @@ void BytecodeTranslateVisitor::visitCallNode(CallNode* node) {
         }
     }
 
-    translated_function->bytecode()->addInsn(BC_CALL);
-    translated_function->bytecode()->addUInt16(fun->id());
+    fun_hierarchy.back().bytecode()->addInsn(BC_CALL);
+    fun_hierarchy.back().bytecode()->addUInt16(fun->id());
 }
 
 void BytecodeTranslateVisitor::visitNativeCallNode(NativeCallNode* node) {
@@ -679,13 +706,13 @@ void BytecodeTranslateVisitor::visitNativeCallNode(NativeCallNode* node) {
     }
 
     uint16_t nat_id =
-            translated_code->makeNativeFunction(
+            bc.makeNativeFunction(
                 node->nativeName(),
                 node->nativeSignature(),
                 (const void*)function_handler);
 
-    translated_function->bytecode()->addInsn(BC_CALLNATIVE);
-    translated_function->bytecode()->addUInt16(nat_id);
+    fun_hierarchy.back().bytecode()->addInsn(BC_CALLNATIVE);
+    fun_hierarchy.back().bytecode()->addUInt16(nat_id);
 }
 
 void BytecodeTranslateVisitor::visitPrintNode(PrintNode* node) {
@@ -699,13 +726,13 @@ void BytecodeTranslateVisitor::visitPrintNode(PrintNode* node) {
         type_stack.pop();
         switch (operand_type) {
         case VT_INT:
-            translated_function->bytecode()->addInsn(BC_IPRINT);
+            fun_hierarchy.back().bytecode()->addInsn(BC_IPRINT);
             break;
         case VT_DOUBLE:
-            translated_function->bytecode()->addInsn(BC_DPRINT);
+            fun_hierarchy.back().bytecode()->addInsn(BC_DPRINT);
             break;
         case VT_STRING:
-            translated_function->bytecode()->addInsn(BC_SPRINT);
+            fun_hierarchy.back().bytecode()->addInsn(BC_SPRINT);
             break;
         default:
             cerr << "Invalid operand type for print: " << typeToName(operand_type)

@@ -11,17 +11,55 @@
 
 namespace mathvm {
 
-union Value {
+struct Value {
     double _doubleValue;
     int64_t _intValue;
-    const char* _stringValue;
+    string _stringValue = "";
 
     Value() = default;
     Value(double d): _doubleValue(d) {}
     Value(int64_t i): _intValue(i) {}
     Value(int i): _intValue((uint64_t)i) {}
-    Value(const char* s): _stringValue(s) {}
-    Value(string s): _stringValue(s.c_str()) {}
+//    Value(const char* s): _stringValue(s) {}
+    Value(string s): _stringValue(s) {}
+};
+
+class LocalVar : public Var {
+    string stringValue;
+public:
+    LocalVar(VarType type = VT_INT, const string& name = ""):
+        Var(type, name) {}
+
+    void setStringValue(string s) {
+        stringValue = s;
+    }
+
+    string getStringValue() const {
+        return stringValue;
+    }
+};
+
+const pair<int, int> EMPTY(-1, -1);
+
+class StackFrame : public BytecodeFunction {
+    map<pair<uint16_t, uint16_t>, LocalVar> vars;
+public:
+    StackFrame(const BytecodeFunction& bf): BytecodeFunction(bf) {}
+    StackFrame(AstFunction* f): BytecodeFunction(f) {}
+
+    map<pair<uint16_t, uint16_t>, LocalVar>& local_vars() {
+        return vars;
+    }
+
+    pair<int, int> lookup_local_var(AstVar* var) {
+        for(auto const& entry: vars) {
+            if(entry.second.name() == var->name()
+                    && entry.second.type() == var->type()) {
+                return entry.first;
+            }
+        }
+        return EMPTY;
+    }
 };
 
 class BytecodeCode : public Code {
@@ -32,39 +70,28 @@ class BytecodeCode : public Code {
     vector<Scope*> scopes;
     map<Scope*, VarNameMap> var_map;
 
-    BytecodeFunction* translated_function = NULL;
-    vector<vector<Var>> *var_by_scope = NULL;
+    vector<vector<LocalVar>> var_by_scope;
 
     vector<uint16_t> scope_stack;
     stack<Value> value_stack;
-    vector<Bytecode*> call_stack;
+    vector<StackFrame> call_stack;
+
+    uint16_t top_function_id = 0;
 
     void print_funs();
 public:
 
-    BytecodeCode() {
-        translated_function = NULL;
-        var_by_scope = new vector<vector<Var>>();
-    }
-
-//    BytecodeCode(BytecodeFunction* bf, vector<vector<Var>> *v_ptr):
-//        BytecodeCode() {
-//        translated_function = bf;
-//        var_by_scope = v_ptr;
-//    }
-
-    BytecodeFunction* get_translated_function() {
-        return translated_function;
-    }
-
-    void set_translated_function(BytecodeFunction* bf);
-    vector<vector<Var> > get_var_by_scope();
     uint16_t add_scope(Scope* scope);
-    uint16_t add_var(Scope* scope, VarType type, string name);
-    uint16_t add_var(Scope* scope, AstVar* var);
+    int add_var(Scope* scope, VarType type, string name);
+    int get_scope_id(Scope* scope);
+    int get_var_id(Scope* scope, string name);
     /***/
 
-    void set_var(Var* to, Var* from);
+    void set_top_function_id(uint16_t id) {
+        top_function_id = id;
+    }
+
+    void set_var(LocalVar* to, LocalVar* from);
     Status* call(int call_id);
     virtual Status* execute(vector<Var *> &vars);
     /*

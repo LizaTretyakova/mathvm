@@ -60,8 +60,8 @@ int main(int argc, char** argv) {
           vector<Var*> vars;
 
           if (isDefaultExpr) {
-            Var* xVar = new Var(VT_DOUBLE, "x");
-            Var* yVar = new Var(VT_DOUBLE, "y");
+            LocalVar* xVar = new LocalVar(VT_DOUBLE, "x");
+            LocalVar* yVar = new LocalVar(VT_DOUBLE, "y");
             vars.push_back(xVar);
             vars.push_back(yVar);
             xVar->setDoubleValue(42.0);
