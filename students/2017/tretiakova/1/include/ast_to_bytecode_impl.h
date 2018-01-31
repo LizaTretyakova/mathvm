@@ -47,7 +47,6 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
 
     void print_fun_hierarchy() {
         cerr << "[FunHierarchy]: ";
-//        for(StackFrame* sf: fun_hierarchy) {
         for(int i = 0; i < (int)fun_hierarchy.size(); ++i) {
             cerr << fun_hierarchy[i]->name() << " ";
         }

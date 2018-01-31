@@ -192,10 +192,6 @@ void BytecodeTranslateVisitor::update_jmp(uint32_t src) {
     // -2 because the offset
 }
 
-//BytecodeCode BytecodeTranslateVisitor::program() {
-//    return bcode;
-//}
-
 Status* BytecodeTranslateVisitor::get_status() {
     return status;
 }
@@ -594,15 +590,6 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
         fun->node()->visit(this);
         fun_hierarchy.pop_back();
         print_fun_hierarchy();
-    }
-
-    for(Scope::VarIterator it(block_scope); it.hasNext();) {
-        AstVar* var = it.next();
-        cerr << "**AstVar <- " << var->owner() << endl;
-//        Scope* scope = var->owner();
-//        uint16_t scope_id = add_scope(scope);
-//        uint16_t var_id = add_var(scope, var->type(), var->name());
-//        push_store(var->type(), scope_id, var_id, node->position());
     }
 
     for (uint32_t i = 0; i < node->nodes(); i++) {

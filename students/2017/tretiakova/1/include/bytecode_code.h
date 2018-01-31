@@ -20,7 +20,6 @@ struct Value {
     Value(double d): _doubleValue(d) {}
     Value(int64_t i): _intValue(i) {}
     Value(int i): _intValue((uint64_t)i) {}
-//    Value(const char* s): _stringValue(s) {}
     Value(string s): _stringValue(s) {}
 };
 

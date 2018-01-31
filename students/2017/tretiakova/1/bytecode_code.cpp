@@ -118,22 +118,7 @@ void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
     }
 }
 
-void print_value_stack(const stack<Value>& s) {
-    const Value* end   = &s.top() + 1;
-    const Value* begin = end - s.size();
-    std::vector<Value> stack_contents(begin, end);
-    cerr << "Value stack [beginning --> end]: ";
-    for(Value v: stack_contents) {
-        cerr << "(" << v._doubleValue << ", " << v._intValue << ", " << v._stringValue << ") ";
-    }
-    cerr << endl;
-}
-
 Status* BytecodeCode::call(int call_id, ofstream& out) {
-//    Bytecode* cur = call_stack[call_id].bytecode();
-//    map<pair<uint16_t, uint16_t>, LocalVar>* call_stack[call_id].local_vars() =
-//            call_stack[call_id].local_vars();
-//    ofstream out("debug.output", "a");
     out << endl;
     // cannot define them in the switch-block
     Value t;
@@ -152,14 +137,10 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
     pair<uint16_t, uint16_t> identifier;
 
     for (size_t bci = 0; bci < call_stack[call_id].bytecode()->length();) {
-//        print_value_stack(value_stack);
-
         size_t length;
         Instruction insn = call_stack[call_id].bytecode()->getInsn(bci);
         out << bci << ": ";
         const char* name = bytecodeName(insn, &length);
-//        print_value_stack(value_stack);
-//        cerr << "[" << string(name) << "]" << endl;
         switch (insn) {
             case BC_DLOAD:
                 out << name << " " << call_stack[call_id].bytecode()->getDouble(bci + 1);
@@ -272,9 +253,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
                 scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
                 var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
                 identifier = make_pair(scope_id, var_id);
-//                cerr << "scope_id " << scope_id << " var_id " << var_id << endl;
-//                Value stop = value_stack.top();
-//                cerr << stop._intValue();
                 assert(call_stack[call_id].local_vars()->count(identifier) > 0);
                 value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getIntValue());
 
@@ -607,17 +585,7 @@ Status* BytecodeCode::execute(vector<Var *> &vars) {
         if(var_id.first != -1 && var_id.second != -1) {
             (*global_vars)[var_id] = lvar;
         }
-//        for(int i = 0; i < (int)var_by_scope[top_scope_id].size(); ++i) {
-//            if(var_by_scope[top_scope_id][i].name()
-//                    == lvar.name()) {
-//                pair<uint16_t, uint16_t> identifier =
-//                        make_pair((uint16_t)top_scope_id, (uint16_t)i);
-//                (*global_vars)[identifier] = lvar;
-//                break;
-//            }
-//        }
     }
-//    add_scope(scopes[top_scope_id]);
     call_stack.push_back(sf);
     Status* status = call(0, out);
     return status;
