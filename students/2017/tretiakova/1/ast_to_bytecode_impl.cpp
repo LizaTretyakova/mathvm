@@ -40,18 +40,30 @@ VarType BytecodeTranslateVisitor::update_type_stack() {
         return VT_INVALID;
     }
 
-    VarType t_right = type_stack.top();
-    type_stack.pop();
     VarType t_left = type_stack.top();
+    type_stack.pop();
+    VarType t_right = type_stack.top();
     type_stack.pop();
     VarType result;
 
     switch(t_left) {
-    case VT_DOUBLE:
-    case VT_INT:
     case VT_STRING:
         result =
             t_right == t_left ? t_left : VT_INVALID;
+        break;
+    case VT_DOUBLE:
+        if(t_right != VT_INT && t_right != VT_DOUBLE) {
+            result = VT_INVALID;
+            break;
+        }
+        result = VT_DOUBLE;
+        break;
+    case VT_INT:
+        if(t_right != VT_INT && t_right != VT_DOUBLE) {
+            result = VT_INVALID;
+            break;
+        }
+        result = t_right;
         break;
     default:
         result = VT_INVALID;
@@ -201,7 +213,14 @@ void BytecodeTranslateVisitor::visitBinaryOpNode(BinaryOpNode* node) {
 
     // Order!
     node->right()->visit(this);
+    // store some info about it
+    uint32_t after_right_pos = fun_hierarchy.back()->bytecode()->current();
+    fun_hierarchy.back()->bytecode()->addInsn(BC_DUMP);
+    VarType right_type = type_stack.top();
+    // I don't get what the DUMP is: 'dump without removal'?
+    // So it will be an idle placeholder
     node->left()->visit(this);
+    VarType left_type = type_stack.top();
 
     VarType type = update_type_stack();
     if(type == VT_INVALID || type == VT_VOID) {
@@ -210,6 +229,34 @@ void BytecodeTranslateVisitor::visitBinaryOpNode(BinaryOpNode* node) {
              << ", position " << node->position() << endl;
         invalidate("Invalid type before BinaryOp", node->position());
         return;
+    }
+    if(right_type != type) {
+        if(right_type == VT_INT && type == VT_DOUBLE) {
+            (Bytecode*)(fun_hierarchy.back()->bytecode())->set(after_right_pos, BC_I2D);
+        } else if(right_type == VT_DOUBLE && type == VT_INT) {
+            // ?!
+            cerr << "[ALARM] double-to-int conversion right" << endl;
+            (Bytecode*)(fun_hierarchy.back()->bytecode())->set(after_right_pos, BC_D2I);
+        } else {
+            cerr << "Unknown conversion right: " << typeToName(right_type)
+                 << " to " << typeToName(type) << endl;
+            invalidate("Unknown conversion right", node->position());
+            return;
+        }
+    }
+    if(left_type != type) {
+        if(left_type == VT_INT && type == VT_DOUBLE) {
+            (Bytecode*)(fun_hierarchy.back()->bytecode())->addInsn(BC_I2D);
+        } else if(left_type == VT_DOUBLE && type == VT_INT) {
+            // ?!
+            cerr << "[ALARM] double-to-int conversion left" << endl;
+            (Bytecode*)(fun_hierarchy.back()->bytecode())->addInsn(BC_D2I);
+        } else {
+            cerr << "Unknown conversion left: " << typeToName(right_type)
+                 << " to " << typeToName(type) << endl;
+            invalidate("Unknown conversion left", node->position());
+            return;
+        }
     }
 
     switch(node->kind()) {
