@@ -40,14 +40,6 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void update_jmp(uint32_t from);
     bool fix_type_mismatch(VarType expected_type, VarType got_type);
 
-    void print_fun_hierarchy() {
-        cerr << "[FunHierarchy]: ";
-        for(int i = 0; i < (int)fun_hierarchy.size(); ++i) {
-            cerr << fun_hierarchy[i]->name() << " ";
-        }
-        cerr << endl;
-    }
-
 public:
 
     BytecodeTranslateVisitor(BytecodeCode* b): bcode(b) {}
@@ -56,13 +48,10 @@ public:
     void setTopFunction(AstFunction* f) {
         StackFrame* sf = new StackFrame(f);
         fun_hierarchy.push_back(sf);
-        print_fun_hierarchy();
-
     }
     void unsetTopFunction() {
         assert(fun_hierarchy.size() == 1);
         fun_hierarchy.pop_back();
-        print_fun_hierarchy();
     }
 
     virtual void visitBinaryOpNode(BinaryOpNode* node);

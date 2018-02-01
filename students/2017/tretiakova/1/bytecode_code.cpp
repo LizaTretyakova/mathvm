@@ -130,18 +130,6 @@ void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
     }
 }
 
-void print_value_stack(stack<Value> s) { // sic! copy
-    cerr << "Value stack [top <-- bottom]: ";
-    while(s.size() > 0) {
-        cerr << "("
-             << s.top()._doubleValue << ", "
-             << s.top()._intValue << ", "
-             << s.top()._stringValue << ") ";
-        s.pop();
-    }
-    cerr << endl;
-}
-
 Status* BytecodeCode::call(int call_id, ofstream& out) {
     // cannot define them in the switch-block
     Value t;

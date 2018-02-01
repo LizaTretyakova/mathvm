@@ -18,7 +18,6 @@ namespace mathvm {
 using namespace std;
 
 void BytecodeTranslateVisitor::invalidate(string msg, uint32_t pos) {
-//        type_stack.pop();
     cerr << "[Translator] invalidate INVALID" << endl;
     type_stack.push(VT_INVALID);
     status = Status::Error(msg.c_str(), pos);
@@ -683,10 +682,8 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
         StackFrame* sf = (StackFrame*)(bcode->functionByName(fun->name()));
 
         fun_hierarchy.push_back(sf);
-        print_fun_hierarchy();
         fun->node()->visit(this);
         fun_hierarchy.pop_back();
-        print_fun_hierarchy();
     }
 
     for (uint32_t i = 0; i < node->nodes(); i++) {
