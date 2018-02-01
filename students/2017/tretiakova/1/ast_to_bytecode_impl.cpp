@@ -405,9 +405,6 @@ void BytecodeTranslateVisitor::visitDoubleLiteralNode(DoubleLiteralNode* node) {
 void BytecodeTranslateVisitor::visitIntLiteralNode(IntLiteralNode* node) {
     cerr << "[IntLiteral]" << endl;
 
-    cerr << node->literal() << endl;
-    cerr << fun_hierarchy.back() << endl;
-
     fun_hierarchy.back()->bytecode()->addInsn(BC_ILOAD);
     fun_hierarchy.back()->bytecode()->addInt64(node->literal());
     type_stack.push(VT_INT);
