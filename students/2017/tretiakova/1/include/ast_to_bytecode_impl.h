@@ -20,12 +20,6 @@ using namespace std;
 typedef void* (*dl_fun_ptr)();
 
 class BytecodeTranslateVisitor : public AstBaseVisitor {
-//    BytecodeCode* translated_code = NULL;
-//    BytecodeFunction* translated_function = NULL;
-    // The default value. It's here due to invariant that
-    // *** visitor visits one function at a time ***
-//    VarType return_type = VT_VOID;
-
     BytecodeCode* bcode;
     vector<StackFrame*> fun_hierarchy; // No.
     stack<VarType> type_stack;

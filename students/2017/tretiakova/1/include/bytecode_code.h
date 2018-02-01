@@ -47,7 +47,6 @@ public:
     StackFrame(AstFunction* f): BytecodeFunction(f) {}
 
     map<pair<uint16_t, uint16_t>, LocalVar>* local_vars() {
-//        cerr << "*** ALARM local vars access" << endl;
         return &vars;
     }
 
@@ -62,9 +61,6 @@ public:
     }
 
     void define_local_var(pair<uint16_t, uint16_t> identifier) {
-//        cerr << "*** DEFINE LOCAL VAR (" << identifier.first
-//             << ", " << identifier.second  << ") "
-//             << "in " << scopeId() << endl;
         vars[identifier];
     }
 };
@@ -96,17 +92,7 @@ public:
 
     int lookup_frame(int call_id, pair<uint16_t, uint16_t> identifier) {
         int frame_ptr = call_id;
-//        cerr << "frame_ptr " << frame_ptr
-//             << " stack scope id " << call_stack[frame_ptr].scopeId()
-//             << " target scope id " << identifier.first
-//             << " target var id " << identifier.second
-//             << " map size " << call_stack[frame_ptr].local_vars()->size() << endl;
         while(frame_ptr >= 0 && !call_stack[frame_ptr].local_vars()->count(identifier)) {
-//            cerr << "frame_ptr " << frame_ptr
-//                 << " stack scope id " << call_stack[frame_ptr].scopeId()
-//                 << " target scope id " << identifier.first
-//                 << " target var id " << identifier.second
-//                 << " map size " << call_stack[frame_ptr].local_vars()->size() << endl;
             --frame_ptr;
         }
         return frame_ptr;
@@ -115,42 +101,6 @@ public:
     void set_var(LocalVar* to, LocalVar* from);
     Status* call(int call_id, ofstream& out);
     virtual Status* execute(vector<Var *> &vars);
-    /*
-     *  BC_CALL
-        BC_CALLNATIVE
-        BC_DADD
-        BC_DCMP
-        BC_DDIV
-        BC_DLOAD
-        BC_DMUL
-        BC_DNEG
-        BC_DPRINT
-        BC_DSUB
-        BC_IAAND
-        BC_IADD
-        BC_IAOR
-        BC_IAXOR
-        BC_ICMP
-        BC_IDIV
-        BC_IFICMPE
-        BC_IFICMPG
-        BC_ILOAD
-        BC_IMUL
-        BC_INEG
-        BC_IPRINT
-        BC_ISUB
-        BC_JA
-        BC_LOADCTXDVAR
-        BC_LOADCTXIVAR
-        BC_LOADCTXSVAR
-        BC_MOD
-        BC_RETURN
-        BC_SLOAD
-        BC_SPRINT
-        BC_STORECTXDVAR
-        BC_STORECTXIVAR
-        BC_STORECTXSVAR
-     */
 };
 
 }

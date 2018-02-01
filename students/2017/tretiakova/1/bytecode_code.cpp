@@ -14,7 +14,6 @@
 namespace mathvm {
 
 int BytecodeCode::get_scope_id(Scope* scope) {
-//    cerr << "get scope id for " << scope << endl;
     if(!scope_map.count(scope)) {
         return -1;
     }
@@ -22,7 +21,6 @@ int BytecodeCode::get_scope_id(Scope* scope) {
 }
 
 pair<int, int> BytecodeCode::get_var_id(Scope* scope, string name) {
-//    cerr << "get var id for " << name << " in " << scope << endl;
     Scope* cur = scope;
     while(cur && !var_map[cur].count(name)) {
         cur = cur->parent();
@@ -37,7 +35,6 @@ pair<int, int> BytecodeCode::get_var_id(Scope* scope, string name) {
 }
 
 int BytecodeCode::add_var(Scope* scope, VarType type, string name) {
-//    cerr << "add var id for " << typeToName(type) << " " << name << " in " << scope << endl;
     int scope_id = get_scope_id(scope);
     if(scope_id < 0) {
         return scope_id;
@@ -82,7 +79,6 @@ int BytecodeCode::add_var(Scope* scope, VarType type, string name) {
 }
 
 uint16_t BytecodeCode::add_scope(Scope* scope) {
-//    cerr << "add scope " << scope << "{" << endl;
     if(!scope_map.count(scope)) {
         uint16_t scope_id = (uint16_t)scope_map.size();
         scope_map[scope] = scope_id;
@@ -109,11 +105,9 @@ uint16_t BytecodeCode::add_scope(Scope* scope) {
             }
         }
 
-//        cerr << "} id " << scope_id << endl;
         return scope_id;
     }
 
-//    cerr << "}" << endl;
     return scope_map[scope];
 }
 
@@ -131,7 +125,7 @@ void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
         to->setStringValue(from->getStringValue());
         return;
     default:
-//        cerr << "Invalid variable type" << endl;
+        cerr << "Invalid variable type" << endl;
         assert(false);
     }
 }
@@ -149,8 +143,6 @@ void print_value_stack(stack<Value> s) { // sic! copy
 }
 
 Status* BytecodeCode::call(int call_id, ofstream& out) {
-//    cout << call_id << endl;
-//    out << endl;
     // cannot define them in the switch-block
     Value t;
     Value b;
@@ -168,20 +160,15 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
     int diff;
     pair<uint16_t, uint16_t> identifier;
 
-    LocalVar lvar;
-
     for (size_t bci = 0; bci < call_stack[call_id].bytecode()->length();) {
         size_t length;
         Instruction insn = call_stack[call_id].bytecode()->getInsn(bci);
 //        out << bci << ": ";
         const char* name = bytecodeName(insn, &length);
         (void)name;
-//        print_value_stack(value_stack);
-//        cerr << name << endl;
         switch (insn) {
         case BC_DLOAD:
 //            out << name << " " << call_stack[call_id].bytecode()->getDouble(bci + 1);
-//            cerr << name << " " << call_stack[call_id].bytecode()->getDouble(bci + 1);
 
             dval = call_stack[call_id].bytecode()->getDouble(bci + 1);
             value_stack.emplace(dval);
@@ -189,42 +176,36 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
         case BC_ILOAD:
 //            out << name << " " << call_stack[call_id].bytecode()->getInt64(bci + 1);
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt64(bci + 1);
 
             ival = call_stack[call_id].bytecode()->getInt64(bci + 1);
             value_stack.emplace(ival);
 
             break;
         case BC_DLOAD0:
-//            cerr << name;
 //            out << name;
 
             value_stack.emplace(0.0);
 
             break;
         case BC_ILOAD0:
-//            cerr << name;
 //            out << name;
 
             value_stack.emplace(0);
 
             break;
         case BC_DLOAD1:
-//            cerr << name;
 //            out << name;
 
             value_stack.emplace(1.0);
 
             break;
         case BC_ILOAD1:
-//            cerr << name;
 //            out << name;
 
             value_stack.emplace(1);
 
             break;
         case BC_SLOAD:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 
             sid = call_stack[call_id].bytecode()->getUInt16(bci + 1);
@@ -232,7 +213,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_CALL:
-//    //        cerr << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 //            out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 
             fun_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
@@ -257,7 +237,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_CALLNATIVE:
-//    //        cerr << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 //            out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
             break;
         case BC_LOADDVAR:
@@ -266,12 +245,9 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
         case BC_STOREIVAR:
         case BC_LOADSVAR:
         case BC_STORESVAR:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
             break;
         case BC_LOADCTXDVAR:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-//                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
 //                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
@@ -286,8 +262,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_STORECTXDVAR:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-//                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
 //                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
@@ -305,8 +279,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_LOADCTXIVAR:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-//                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
 //                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
@@ -321,8 +293,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_STORECTXIVAR:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-//                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
 //                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
@@ -337,21 +307,9 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             value_stack.pop();
             (*call_stack[frame_ptr].local_vars())[identifier] = var_by_scope[scope_id][var_id];
             (*call_stack[frame_ptr].local_vars())[identifier].setIntValue(t._intValue);
-
-//            lvar = (*call_stack[frame_ptr].local_vars())[identifier];
-//            cerr << "[STORE]d CTXIVAR " << typeToName(lvar.type())
-//                 << " " << lvar.name()
-//                 << " " << lvar.getIntValue() << endl;
-//            cerr << endl << "[STORE]d CTXIVAR " << typeToName(lvar.type())
-//                 << " " << lvar.name()
-//                 << " " << lvar.getIntValue()
-//                 << " " << frame_ptr << endl;
-
             break;
 
         case BC_LOADCTXSVAR:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-//                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
 //                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
@@ -366,8 +324,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_STORECTXSVAR:
-//            cerr << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-//                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 //            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
 //                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
@@ -386,7 +342,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IFICMPNE:
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 //            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
             t = value_stack.top();
@@ -400,7 +355,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_IFICMPE:
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 //            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
             t = value_stack.top();
@@ -414,7 +368,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_IFICMPG:
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 //            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
             t = value_stack.top();
@@ -428,7 +381,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_IFICMPGE:
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 //            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
             t = value_stack.top();
@@ -442,7 +394,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_IFICMPL:
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 //            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
             t = value_stack.top();
@@ -456,7 +407,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_IFICMPLE:
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 //            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
             t = value_stack.top();
@@ -470,7 +420,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_JA:
-//            cerr << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 //            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
             offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
@@ -478,12 +427,10 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
 
             break;
         case BC_RETURN:
-//            cerr << name;
 //            out << name;
             return Status::Ok();
 
         case BC_DADD:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -494,7 +441,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IADD:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -505,7 +451,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_DCMP:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -522,7 +467,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_ICMP:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -539,7 +483,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_DDIV:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -550,7 +493,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IDIV:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -561,7 +503,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_DMUL:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -572,7 +513,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IMUL:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -583,7 +523,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_DNEG:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -592,7 +531,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_INEG:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -601,7 +539,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_DPRINT:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -610,7 +547,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IPRINT:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -619,7 +555,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_SPRINT:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -628,7 +563,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_DSUB:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -639,7 +573,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_ISUB:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -650,7 +583,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IMOD:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -661,7 +593,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IAAND:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -672,7 +603,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IAOR:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -683,7 +613,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_IAXOR:
-//            cerr << name;
 //            out << name;
 
             t = value_stack.top();
@@ -694,12 +623,10 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_DUMP:
-//            cerr << "--- idle";
 //            out << "--- idle";
             break;
 
         case BC_I2D:
-//            cerr << name;
 //            out << name;
             t = value_stack.top();
             value_stack.pop();
@@ -707,7 +634,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_D2I:
-//            cerr << name;
 //            out << name;
             t = value_stack.top();
             value_stack.pop();
@@ -715,7 +641,6 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_S2I:
-//            cerr << name;
 //            out << name;
             t = value_stack.top();
             value_stack.pop();
@@ -723,17 +648,14 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             break;
 
         case BC_POP:
-//            cerr << name;
 //            out << name;
             value_stack.pop();
             break;
 
         default:
-//            cerr << name;
 //            out << name;
             break;
         }
-//        cerr << endl;
 //        out << endl;
         bci += length;
     }

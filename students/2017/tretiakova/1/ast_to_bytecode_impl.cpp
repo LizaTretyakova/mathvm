@@ -377,7 +377,6 @@ void BytecodeTranslateVisitor::visitUnaryOpNode(UnaryOpNode* node) {
             invalidate("Non-int operand in tNOT", node->position());
             break;
         }
-        // fun_hierarchy.back()->bytecode()->addInsn(BC_ICMP);
 
         fun_hierarchy.back()->bytecode()->addInsn(BC_ILOAD0);
         // pushed int
@@ -506,10 +505,6 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
         fun_hierarchy.back()->bytecode()->addUInt16(var_id.first);
         fun_hierarchy.back()->bytecode()->addUInt16(var_id.second);
     }
-//    else { // set value; probably, it's the first time?
-//        LocalVar lvar(var->type(), var->name());
-//        (*(fun_hierarchy.back()->local_vars()))[var_id] = lvar;
-//    }
 
     node->value()->visit(this);
     VarType value_type = update_type_stack_un();
