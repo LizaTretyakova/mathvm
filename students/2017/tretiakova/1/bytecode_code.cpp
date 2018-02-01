@@ -45,6 +45,19 @@ int BytecodeCode::add_var(Scope* scope, VarType type, string name) {
 
     if(!var_map[scope].count(name)) {
         uint16_t var_id = var_map[scope].size();
+        if(var_id != var_by_scope[scope_id].size()) {
+            cerr << "*** MISMATCH: "
+                 << typeToName(type) << " "
+                 << name << " at scope "
+                 << scope << " with id "
+                 << scope_id << " got var id "
+                 << var_id << " while size is "
+                 << var_by_scope[scope_id].size()
+                 << endl;
+            if(var_map[scope].size() > (1<<16) - 1) {
+                cerr << "Variable id pool overflow" << endl;
+            }
+        }
         assert(var_id == var_by_scope[scope_id].size());
         var_map[scope][name] = var_id;
         var_by_scope[scope_id].emplace_back(type, name);

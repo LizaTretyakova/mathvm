@@ -263,7 +263,7 @@ void BytecodeTranslateVisitor::visitBinaryOpNode(BinaryOpNode* node) {
     VarType left_type = type_stack.top();
 
     VarType type = update_type_stack();
-    if(type == VT_INVALID || type == VT_VOID) {
+    if(type != VT_INT && type != VT_DOUBLE) {
         cerr << "Invalid type before BinaryOp, type "
              << typeToName(type)
              << ", position " << node->position() << endl;
