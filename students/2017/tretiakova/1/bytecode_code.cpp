@@ -89,14 +89,18 @@ uint16_t BytecodeCode::add_scope(Scope* scope) {
 
         for(Scope::FunctionIterator fit(scope); fit.hasNext();) {
             AstFunction* f = fit.next();
-            cerr << "function " << f->name() << endl;
+            StackFrame* sf = new StackFrame(f);
+            uint16_t f_id = addFunction(sf);
+            if(f->name() == "<top>") {
+                top_function_id = f_id;
+            }
         }
 
 //        cerr << "} id " << scope_id << endl;
         return scope_id;
     }
 
-    cerr << "}" << endl;
+//    cerr << "}" << endl;
     return scope_map[scope];
 }
 
@@ -703,6 +707,12 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             t = value_stack.top();
             value_stack.pop();
             value_stack.emplace(stoi(t._stringValue));
+            break;
+
+        case BC_POP:
+//            cerr << name;
+//            out << name;
+            value_stack.pop();
             break;
 
         default:

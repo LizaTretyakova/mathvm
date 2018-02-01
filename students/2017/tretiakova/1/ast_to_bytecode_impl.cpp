@@ -685,11 +685,10 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
 
     for(Scope::FunctionIterator it(block_scope); it.hasNext();) {
         AstFunction* fun = it.next();
-        StackFrame* sf = new StackFrame(fun);
+        StackFrame* sf = (StackFrame*)(bcode->functionByName(fun->name()));
 
         fun_hierarchy.push_back(sf);
         print_fun_hierarchy();
-        bcode->addFunction(sf);
         fun->node()->visit(this);
         fun_hierarchy.pop_back();
         print_fun_hierarchy();
@@ -697,6 +696,13 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
 
     for (uint32_t i = 0; i < node->nodes(); i++) {
         node->nodeAt(i)->visit(this);
+        if(node->nodeAt(i)->isCallNode()) {
+            VarType rt = bcode->functionByName(
+                        node->nodeAt(i)->asCallNode()->name())->returnType();
+            if(rt != VT_VOID) {
+                fun_hierarchy.back()->bytecode()->addInsn(BC_POP);
+            }
+        }
     }
 }
 
@@ -743,9 +749,11 @@ void BytecodeTranslateVisitor::visitReturnNode(ReturnNode* node) {
 }
 
 void BytecodeTranslateVisitor::visitCallNode(CallNode* node) {
-    cerr << "[Call]" << endl;
+    cerr << "[Call] ";// << endl;
+    cerr << node->name() << endl;
 
     StackFrame* tsf = (StackFrame*)bcode->functionByName(node->name());
+    cerr << tsf << endl;
     if(node->parametersNumber() != tsf->parametersNumber()) {
         cerr << "Parameters number mismatch at function " << node->name()
              << " at position " << node->position();

@@ -94,10 +94,6 @@ public:
     pair<int, int> get_var_id(Scope* scope, string name);
     /***/
 
-    void set_top_function_id(uint16_t id) {
-        top_function_id = id;
-    }
-
     int lookup_frame(int call_id, pair<uint16_t, uint16_t> identifier) {
         int frame_ptr = call_id;
 //        cerr << "frame_ptr " << frame_ptr

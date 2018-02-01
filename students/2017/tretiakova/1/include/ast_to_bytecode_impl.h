@@ -67,9 +67,6 @@ public:
     }
     void unsetTopFunction() {
         assert(fun_hierarchy.size() == 1);
-        StackFrame* sf = fun_hierarchy.back();
-        uint16_t fun_id = bcode->addFunction(sf);
-        bcode->set_top_function_id(fun_id);
         fun_hierarchy.pop_back();
         print_fun_hierarchy();
     }
