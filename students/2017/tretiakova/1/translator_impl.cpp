@@ -59,22 +59,7 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     top->node()->visit(&visitor);
     visitor.unsetTopFunction();
 
-//    int i;
-//    StackFrame* sss;
-//    for(i = 0, sss = (StackFrame*)((BytecodeCode*)(*code))->functionById(i); sss; ++i, sss = (StackFrame*)((BytecodeCode*)(*code))->functionById(i)) {
-//        cerr << "Function with scope " << sss->scopeId() << " ";
-//        for(auto const& entry: *(sss->local_vars())) {
-//            cerr << "(scope_id " << entry.first.first
-//                 << ", var_id " << entry.first.second
-//                 << ", " << typeToName(entry.second.type())
-//                 << " " << entry.second.name() << ") ";
-//        }
-//        cerr << endl;
-//    }
-
     status = visitor.get_status();
-//    BytecodeCode b = visitor.program();
-//    (*code) = new BytecodeCode(b);
 
     delete parser;
 
