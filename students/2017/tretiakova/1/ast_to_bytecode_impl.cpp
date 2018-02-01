@@ -117,6 +117,27 @@ void BytecodeTranslateVisitor::push_condition(VarType type, Instruction comp_ins
     type_stack.push(VT_INT);
     // what we leave after comparison
 
+    if(type == VT_DOUBLE) {
+        fun_hierarchy.back()->bytecode()->addInsn(BC_DCMP);
+        fun_hierarchy.back()->bytecode()->addInsn(BC_ILOAD0);
+        switch(comp_insn) {
+        case BC_IFICMPG:
+            comp_insn = BC_IFICMPL;
+            break;
+        case BC_IFICMPGE:
+            comp_insn = BC_IFICMPLE;
+            break;
+        case BC_IFICMPL:
+            comp_insn = BC_IFICMPG;
+            break;
+        case BC_IFICMPLE:
+            comp_insn = BC_IFICMPGE;
+            break;
+        default:
+            break;
+        }
+    }
+
     fun_hierarchy.back()->bytecode()->addInsn(comp_insn);
     fun_hierarchy.back()->bytecode()->addInt16(2 + 2); // if true, goto load1
     fun_hierarchy.back()->bytecode()->addInsn(BC_ILOAD0);
@@ -232,11 +253,11 @@ void BytecodeTranslateVisitor::visitBinaryOpNode(BinaryOpNode* node) {
     }
     if(right_type != type) {
         if(right_type == VT_INT && type == VT_DOUBLE) {
-            (Bytecode*)(fun_hierarchy.back()->bytecode())->set(after_right_pos, BC_I2D);
+            fun_hierarchy.back()->bytecode()->set(after_right_pos, BC_I2D);
         } else if(right_type == VT_DOUBLE && type == VT_INT) {
             // ?!
             cerr << "[ALARM] double-to-int conversion right" << endl;
-            (Bytecode*)(fun_hierarchy.back()->bytecode())->set(after_right_pos, BC_D2I);
+            fun_hierarchy.back()->bytecode()->set(after_right_pos, BC_D2I);
         } else {
             cerr << "Unknown conversion right: " << typeToName(right_type)
                  << " to " << typeToName(type) << endl;
@@ -246,11 +267,11 @@ void BytecodeTranslateVisitor::visitBinaryOpNode(BinaryOpNode* node) {
     }
     if(left_type != type) {
         if(left_type == VT_INT && type == VT_DOUBLE) {
-            (Bytecode*)(fun_hierarchy.back()->bytecode())->addInsn(BC_I2D);
+            fun_hierarchy.back()->bytecode()->addInsn(BC_I2D);
         } else if(left_type == VT_DOUBLE && type == VT_INT) {
             // ?!
             cerr << "[ALARM] double-to-int conversion left" << endl;
-            (Bytecode*)(fun_hierarchy.back()->bytecode())->addInsn(BC_D2I);
+            fun_hierarchy.back()->bytecode()->addInsn(BC_D2I);
         } else {
             cerr << "Unknown conversion left: " << typeToName(right_type)
                  << " to " << typeToName(type) << endl;

@@ -118,6 +118,18 @@ void BytecodeCode::set_var(LocalVar* to, LocalVar* from) {
     }
 }
 
+void print_value_stack(stack<Value> s) { // sic! copy
+    cerr << "Value stack [top <-- bottom]: ";
+    while(s.size() > 0) {
+        cerr << "("
+             << s.top()._doubleValue << ", "
+             << s.top()._intValue << ", "
+             << s.top()._stringValue << ") ";
+        s.pop();
+    }
+    cerr << endl;
+}
+
 Status* BytecodeCode::call(int call_id, ofstream& out) {
     out << endl;
     // cannot define them in the switch-block
@@ -141,6 +153,8 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
         Instruction insn = call_stack[call_id].bytecode()->getInsn(bci);
         out << bci << ": ";
         const char* name = bytecodeName(insn, &length);
+        print_value_stack(value_stack);
+        cerr << name << endl;
         switch (insn) {
         case BC_DLOAD:
             out << name << " " << call_stack[call_id].bytecode()->getDouble(bci + 1);
@@ -554,8 +568,27 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             value_stack.pop();
             value_stack.emplace(t._intValue ^ b._intValue);
             break;
-          default:
-                out << name;
+
+        case BC_DUMP:
+            out << "--- idle";
+            break;
+
+        case BC_I2D:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace((double)t._intValue);
+            break;
+
+        case BC_D2I:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace((int)t._doubleValue);
+            break;
+
+        default:
+            out << name;
         }
         out << endl;
         bci += length;
