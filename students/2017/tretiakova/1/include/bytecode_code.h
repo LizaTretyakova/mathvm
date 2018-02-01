@@ -59,6 +59,10 @@ public:
         }
         return EMPTY;
     }
+
+    void define_local_var(pair<uint16_t, uint16_t> identifier) {
+        vars[identifier];
+    }
 };
 
 class BytecodeCode : public Code {
@@ -88,6 +92,19 @@ public:
 
     void set_top_function_id(uint16_t id) {
         top_function_id = id;
+    }
+
+    int lookup_frame(int call_id, pair<uint16_t, uint16_t> identifier) {
+        int frame_ptr = call_id;
+        while(frame_ptr >= 0 && !call_stack[frame_ptr].local_vars()->count(identifier)) {
+            cerr << "frame_ptr " << frame_ptr
+                 << " stack scope id " << call_stack[frame_ptr].scopeId()
+                 << " target scope id " << identifier.first
+                 << " target var id " << identifier.second
+                 << " map size " << call_stack[frame_ptr].local_vars()->size() << endl;
+            --frame_ptr;
+        }
+        return frame_ptr;
     }
 
     void set_var(LocalVar* to, LocalVar* from);

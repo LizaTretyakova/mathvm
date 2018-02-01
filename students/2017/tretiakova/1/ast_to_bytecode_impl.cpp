@@ -648,6 +648,13 @@ void BytecodeTranslateVisitor::visitBlockNode(BlockNode* node) {
     cerr << "[Block] <- " << node->scope() << endl;
 
     Scope* block_scope = node->scope();
+
+    for(Scope::VarIterator it(block_scope); it.hasNext();) {
+        AstVar* var = it.next();
+        pair<int, int> var_id = bcode->get_var_id(block_scope, var->name());
+        fun_hierarchy.back()->define_local_var(var_id);
+    }
+
     for(Scope::FunctionIterator it(block_scope); it.hasNext();) {
         AstFunction* fun = it.next();
         StackFrame* sf = new StackFrame(fun);
@@ -670,6 +677,8 @@ void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
     Scope* scope = node->body()->scope();
     int scope_id = bcode->get_scope_id(scope);
     assert(scope_id >= 0);
+    fun_hierarchy.back()->setScopeId(scope_id);
+
     for(uint32_t i = 0; i < node->parametersNumber(); i++) {
         VarType parameterType = node->parameterType(i);
         string parameterName = node->parameterName(i);
@@ -677,6 +686,7 @@ void BytecodeTranslateVisitor::visitFunctionNode(FunctionNode* node) {
         pair<int, int> var_id = bcode->get_var_id(scope, parameterName);
         assert(var_id.first != -1 && var_id.second != -1);
         push_store(parameterType, var_id.first, var_id.second, node->position());
+        fun_hierarchy.back()->define_local_var(var_id);
     }
     node->body()->visit(this);
 }

@@ -145,6 +145,7 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
     StackFrame* f;
     Status* status;
     int stack_size;
+    int frame_ptr;
     int diff;
     pair<uint16_t, uint16_t> identifier;
 
@@ -243,10 +244,13 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
             var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
             identifier = make_pair(scope_id, var_id);
-            assert(call_stack[call_id].local_vars()->count(identifier) > 0);
-            value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getDoubleValue());
 
+            frame_ptr = lookup_frame(call_id, identifier);
+            assert(frame_ptr >= 0);
+
+            value_stack.emplace((*call_stack[frame_ptr].local_vars())[identifier].getDoubleValue());
             break;
+
         case BC_STORECTXDVAR:
             out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
                 << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
@@ -254,23 +258,38 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
             var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
             identifier = make_pair(scope_id, var_id);
+
+            frame_ptr = lookup_frame(call_id, identifier);
+            assert(frame_ptr >= 0);
+
             t = value_stack.top();
             value_stack.pop();
-            (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
-            (*call_stack[call_id].local_vars())[identifier].setDoubleValue(t._doubleValue);
+            (*call_stack[frame_ptr].local_vars())[identifier] = var_by_scope[scope_id][var_id];
+            (*call_stack[frame_ptr].local_vars())[identifier].setDoubleValue(t._doubleValue);
 
             break;
         case BC_LOADCTXIVAR:
             out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
                 << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
+            out.flush();
 
             scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
             var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
             identifier = make_pair(scope_id, var_id);
-            assert(call_stack[call_id].local_vars()->count(identifier) > 0);
-            value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getIntValue());
+            out << " " << scope_id << " " << var_id;
+            out.flush();
 
+            frame_ptr = lookup_frame(call_id, identifier);
+            if(frame_ptr < 0) {
+                cerr << call_id << " " << scope_id << " " << var_id << endl;
+                cerr << typeToName(var_by_scope[scope_id][var_id].type())
+                     << " " << var_by_scope[scope_id][var_id].name() << endl;
+            }
+            assert(frame_ptr >= 0);
+
+            value_stack.emplace((*call_stack[frame_ptr].local_vars())[identifier].getIntValue());
             break;
+
         case BC_STORECTXIVAR:
             out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
                 << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
@@ -278,12 +297,19 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
             var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
             identifier = make_pair(scope_id, var_id);
+
+            frame_ptr = lookup_frame(call_id, identifier);
+            if(frame_ptr < 0) {
+                cerr << call_id << " " << scope_id << " " << var_id << endl;
+            }
+            assert(frame_ptr >= 0);
+
             t = value_stack.top();
             value_stack.pop();
-            (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
-            (*call_stack[call_id].local_vars())[identifier].setIntValue(t._intValue);
-
+            (*call_stack[frame_ptr].local_vars())[identifier] = var_by_scope[scope_id][var_id];
+            (*call_stack[frame_ptr].local_vars())[identifier].setIntValue(t._intValue);
             break;
+
         case BC_LOADCTXSVAR:
             out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
                 << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
@@ -291,9 +317,13 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
             var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
             identifier = make_pair(scope_id, var_id);
-            assert(call_stack[call_id].local_vars()->count(identifier) > 0);
-            value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getStringValue());
+
+            frame_ptr = lookup_frame(call_id, identifier);
+            assert(frame_ptr >= 0);
+
+            value_stack.emplace((*call_stack[frame_ptr].local_vars())[identifier].getStringValue());
             break;
+
         case BC_STORECTXSVAR:
             out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
                 << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
@@ -301,12 +331,17 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
             scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
             var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
             identifier = make_pair(scope_id, var_id);
+
+            frame_ptr = lookup_frame(call_id, identifier);
+            assert(frame_ptr >= 0);
+
             t = value_stack.top();
             value_stack.pop();
-            (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
-            (*call_stack[call_id].local_vars())[identifier].setStringValue(t._stringValue);
 
+            (*call_stack[frame_ptr].local_vars())[identifier] = var_by_scope[scope_id][var_id];
+            (*call_stack[frame_ptr].local_vars())[identifier].setStringValue(t._stringValue);
             break;
+
         case BC_IFICMPNE:
             out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
 
