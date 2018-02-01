@@ -486,10 +486,11 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
 
         fun_hierarchy.back()->bytecode()->addUInt16(var_id.first);
         fun_hierarchy.back()->bytecode()->addUInt16(var_id.second);
-    } else { // set value; probably, it's the first time?
-        LocalVar lvar(var->type(), var->name());
-        (*(fun_hierarchy.back()->local_vars()))[var_id] = lvar;
     }
+//    else { // set value; probably, it's the first time?
+//        LocalVar lvar(var->type(), var->name());
+//        (*(fun_hierarchy.back()->local_vars()))[var_id] = lvar;
+//    }
 
     node->value()->visit(this);
 

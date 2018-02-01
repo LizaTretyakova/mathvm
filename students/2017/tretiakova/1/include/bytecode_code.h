@@ -47,6 +47,7 @@ public:
     StackFrame(AstFunction* f): BytecodeFunction(f) {}
 
     map<pair<uint16_t, uint16_t>, LocalVar>* local_vars() {
+//        cerr << "*** ALARM local vars access" << endl;
         return &vars;
     }
 
@@ -61,9 +62,9 @@ public:
     }
 
     void define_local_var(pair<uint16_t, uint16_t> identifier) {
-        cerr << "*** DEFINE LOCAL VAR (" << identifier.first
-             << ", " << identifier.second  << ") "
-             << "in " << scopeId() << endl;
+//        cerr << "*** DEFINE LOCAL VAR (" << identifier.first
+//             << ", " << identifier.second  << ") "
+//             << "in " << scopeId() << endl;
         vars[identifier];
     }
 };
