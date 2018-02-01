@@ -225,6 +225,25 @@ void BytecodeTranslateVisitor::update_jmp(uint32_t src) {
     // -2 because the offset
 }
 
+bool BytecodeTranslateVisitor::fix_type_mismatch(VarType expected_type, VarType got_type) {
+    if(expected_type == VT_INT && got_type == VT_DOUBLE) {
+        fun_hierarchy.back()->bytecode()->addInsn(BC_D2I);
+        type_stack.pop();
+        type_stack.push(VT_INT);
+    } else if(expected_type == VT_INT && got_type == VT_STRING) {
+        fun_hierarchy.back()->bytecode()->addInsn(BC_S2I);
+        type_stack.pop();
+        type_stack.push(VT_INT);
+    } else if(expected_type == VT_DOUBLE && got_type == VT_INT) {
+        fun_hierarchy.back()->bytecode()->addInsn(BC_I2D);
+        type_stack.pop();
+        type_stack.push(VT_DOUBLE);
+    } else {
+        return false;
+    }
+    return true;
+}
+
 Status* BytecodeTranslateVisitor::get_status() {
     return status;
 }
@@ -493,6 +512,17 @@ void BytecodeTranslateVisitor::visitStoreNode(StoreNode* node) {
 //    }
 
     node->value()->visit(this);
+    VarType value_type = update_type_stack_un();
+    if(type != value_type) {
+        if(!fix_type_mismatch(type, value_type)) {
+            cerr << "Store type mismatch, expected "
+                 << typeToName(type) << ", got "
+                 << typeToName(value_type) << ", position"
+                 << node->position() << endl;
+            invalidate("Store type mismatch", node->position());
+            return;
+        }
+    }
 
     if(op == tINCRSET) {
         push_numeric(type, BC_IADD, BC_DADD, node->position());
@@ -699,12 +729,14 @@ void BytecodeTranslateVisitor::visitReturnNode(ReturnNode* node) {
         // check for the correct return type
         VarType return_expr_type = update_type_stack_un();
         if(return_expr_type != fun_hierarchy.back()->returnType()) {
-            cerr << "Invalid return type; expected "
-                 << typeToName(fun_hierarchy.back()->returnType()) << ", got "
-                 << typeToName(return_expr_type)
-                 << ", position " << node->position() << endl;
-            invalidate("Invalid return type", node->position());
-            return;
+            if(!fix_type_mismatch(fun_hierarchy.back()->returnType(), return_expr_type)) {
+                cerr << "Invalid return type; expected "
+                     << typeToName(fun_hierarchy.back()->returnType()) << ", got "
+                     << typeToName(return_expr_type)
+                     << ", position " << node->position() << endl;
+                invalidate("Invalid return type", node->position());
+                return;
+            }
         }
     }
     fun_hierarchy.back()->bytecode()->addInsn(BC_RETURN);
@@ -729,12 +761,14 @@ void BytecodeTranslateVisitor::visitCallNode(CallNode* node) {
         param_type = tsf->parameterType(i);
         stack_type = update_type_stack_un();
         if(param_type != stack_type) {
-            cerr << "Parameter type mismatch, expected "
-                 << typeToName(param_type) << ", got "
-                 << typeToName(stack_type) << ", position"
-                 << node->position() << endl;
-            invalidate("Parameter type mismatch", node->position());
-            return;
+            if(!fix_type_mismatch(param_type, stack_type)) {
+                cerr << "Parameter type mismatch, expected "
+                     << typeToName(param_type) << ", got "
+                     << typeToName(stack_type) << ", position"
+                     << node->position() << endl;
+                invalidate("Parameter type mismatch", node->position());
+                return;
+            }
         }
     }
 

@@ -44,6 +44,7 @@ class BytecodeTranslateVisitor : public AstBaseVisitor {
     void push_load_i(uint16_t scope_id, uint16_t var_id);
     void push_ja(uint32_t to);
     void update_jmp(uint32_t from);
+    bool fix_type_mismatch(VarType expected_type, VarType got_type);
 
     void print_fun_hierarchy() {
         cerr << "[FunHierarchy]: ";

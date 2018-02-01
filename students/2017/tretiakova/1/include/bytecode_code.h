@@ -100,17 +100,17 @@ public:
 
     int lookup_frame(int call_id, pair<uint16_t, uint16_t> identifier) {
         int frame_ptr = call_id;
-        cerr << "frame_ptr " << frame_ptr
-             << " stack scope id " << call_stack[frame_ptr].scopeId()
-             << " target scope id " << identifier.first
-             << " target var id " << identifier.second
-             << " map size " << call_stack[frame_ptr].local_vars()->size() << endl;
+//        cerr << "frame_ptr " << frame_ptr
+//             << " stack scope id " << call_stack[frame_ptr].scopeId()
+//             << " target scope id " << identifier.first
+//             << " target var id " << identifier.second
+//             << " map size " << call_stack[frame_ptr].local_vars()->size() << endl;
         while(frame_ptr >= 0 && !call_stack[frame_ptr].local_vars()->count(identifier)) {
-            cerr << "frame_ptr " << frame_ptr
-                 << " stack scope id " << call_stack[frame_ptr].scopeId()
-                 << " target scope id " << identifier.first
-                 << " target var id " << identifier.second
-                 << " map size " << call_stack[frame_ptr].local_vars()->size() << endl;
+//            cerr << "frame_ptr " << frame_ptr
+//                 << " stack scope id " << call_stack[frame_ptr].scopeId()
+//                 << " target scope id " << identifier.first
+//                 << " target var id " << identifier.second
+//                 << " map size " << call_stack[frame_ptr].local_vars()->size() << endl;
             --frame_ptr;
         }
         return frame_ptr;
