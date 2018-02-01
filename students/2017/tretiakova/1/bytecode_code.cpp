@@ -142,418 +142,418 @@ Status* BytecodeCode::call(int call_id, ofstream& out) {
         out << bci << ": ";
         const char* name = bytecodeName(insn, &length);
         switch (insn) {
-            case BC_DLOAD:
-                out << name << " " << call_stack[call_id].bytecode()->getDouble(bci + 1);
+        case BC_DLOAD:
+            out << name << " " << call_stack[call_id].bytecode()->getDouble(bci + 1);
 
-                dval = call_stack[call_id].bytecode()->getDouble(bci + 1);
-                value_stack.emplace(dval);
+            dval = call_stack[call_id].bytecode()->getDouble(bci + 1);
+            value_stack.emplace(dval);
 
-                break;
-            case BC_ILOAD:
-                out << name << " " << call_stack[call_id].bytecode()->getInt64(bci + 1);
+            break;
+        case BC_ILOAD:
+            out << name << " " << call_stack[call_id].bytecode()->getInt64(bci + 1);
 
-                ival = call_stack[call_id].bytecode()->getInt64(bci + 1);
-                value_stack.emplace(ival);
+            ival = call_stack[call_id].bytecode()->getInt64(bci + 1);
+            value_stack.emplace(ival);
 
-                break;
-            case BC_DLOAD0:
-                out << name;
-
-                value_stack.emplace(0.0);
-
-                break;
-            case BC_ILOAD0:
-                out << name;
-
-                value_stack.emplace(0);
-
-                break;
-            case BC_DLOAD1:
-                out << name;
-
-                value_stack.emplace(1.0);
-
-                break;
-            case BC_ILOAD1:
-                out << name;
-
-                value_stack.emplace(1);
-
-                break;
-            case BC_SLOAD:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
-
-                sid = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                value_stack.emplace(constantById(sid));
-
-                break;
-            case BC_CALL:
-                out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
-
-                fun_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                f = (StackFrame*)functionById(fun_id);
-                call_stack.push_back(*f);
-                stack_size = value_stack.size();
-                status = call(call_stack.size() - 1, out);
-                if(status->isError()) {
-                    return status;
-                }
-                diff = stack_size - value_stack.size();
-                if(diff != f->parametersNumber() && diff != f->parametersNumber() - 1) {
-                    cerr << "Suspicious value stack size ("
-                         << "was " << stack_size
-                         << ", became " << value_stack.size()
-                         << ") after function call '"
-                         << functionById(fun_id)->name()
-                         << "'" << endl;
-                    return Status::Error("Suspicious value stack size", bci);
-                }
-                call_stack.pop_back();
-
-                break;
-            case BC_CALLNATIVE:
-                out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                break;
-            case BC_LOADDVAR:
-            case BC_STOREDVAR:
-            case BC_LOADIVAR:
-            case BC_STOREIVAR:
-            case BC_LOADSVAR:
-            case BC_STORESVAR:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                break;
-            case BC_LOADCTXDVAR:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
-
-                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
-                identifier = make_pair(scope_id, var_id);
-                assert(call_stack[call_id].local_vars()->count(identifier) > 0);
-                value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getDoubleValue());
-
-                break;
-            case BC_STORECTXDVAR:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
-
-                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
-                identifier = make_pair(scope_id, var_id);
-                t = value_stack.top();
-                value_stack.pop();
-                (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
-                (*call_stack[call_id].local_vars())[identifier].setDoubleValue(t._doubleValue);
-
-                break;
-            case BC_LOADCTXIVAR:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
-
-                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
-                identifier = make_pair(scope_id, var_id);
-                assert(call_stack[call_id].local_vars()->count(identifier) > 0);
-                value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getIntValue());
-
-                break;
-            case BC_STORECTXIVAR:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
-
-                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
-                identifier = make_pair(scope_id, var_id);
-                t = value_stack.top();
-                value_stack.pop();
-                (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
-                (*call_stack[call_id].local_vars())[identifier].setIntValue(t._intValue);
-
-                break;
-            case BC_LOADCTXSVAR:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
-
-                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
-                identifier = make_pair(scope_id, var_id);
-                assert(call_stack[call_id].local_vars()->count(identifier) > 0);
-                value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getStringValue());
-                break;
-            case BC_STORECTXSVAR:
-                out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
-                    << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
-
-                scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
-                var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
-                identifier = make_pair(scope_id, var_id);
-                t = value_stack.top();
-                value_stack.pop();
-                (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
-                (*call_stack[call_id].local_vars())[identifier].setStringValue(t._stringValue);
-
-                break;
-            case BC_IFICMPNE:
-                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
-
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
-                if(t._intValue != b._intValue) {
-                    bci += offset;
-                }
-
-                break;
-            case BC_IFICMPE:
-                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
-
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
-                if(t._intValue == b._intValue) {
-                    bci += offset;
-                }
-
-                break;
-            case BC_IFICMPG:
-                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
-
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
-                if(t._intValue > b._intValue) {
-                    bci += offset;
-                }
-
-                break;
-            case BC_IFICMPGE:
-                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
-
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
-                if(t._intValue >= b._intValue) {
-                    bci += offset;
-                }
-
-                break;
-            case BC_IFICMPL:
-                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
-
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
-                if(t._intValue < b._intValue) {
-                    bci += offset;
-                }
-
-                break;
-            case BC_IFICMPLE:
-                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
-
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
-                if(t._intValue <= b._intValue) {
-                    bci += offset;
-                }
-
-                break;
-            case BC_JA:
-                out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
-
-                offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
-                bci += offset;
-
-                break;
-            case BC_RETURN:
-                out << name;
-                return Status::Ok();
-
-            case BC_DADD:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._doubleValue + b._doubleValue);
-                break;
-
-            case BC_IADD:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue + b._intValue);
-                break;
-
-            case BC_DCMP:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                if(t._doubleValue < b._doubleValue) {
-                    value_stack.emplace(-1);
-                } else if(t._doubleValue == b._doubleValue) {
-                    value_stack.emplace(0);
-                } else {
-                    value_stack.emplace(1);
-                }
-                break;
-
-            case BC_ICMP:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                if(t._intValue < b._intValue) {
-                    value_stack.emplace(-1);
-                } else if(t._intValue == b._intValue) {
-                    value_stack.emplace(0);
-                } else {
-                    value_stack.emplace(1);
-                }
-                break;
-
-            case BC_DDIV:
+            break;
+        case BC_DLOAD0:
             out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._doubleValue / b._doubleValue);
-                break;
 
-            case BC_IDIV:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue / b._intValue);
-                break;
+            value_stack.emplace(0.0);
 
-            case BC_DMUL:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._doubleValue * b._doubleValue);
-                break;
+            break;
+        case BC_ILOAD0:
+            out << name;
 
-            case BC_IMUL:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue * b._intValue);
-                break;
+            value_stack.emplace(0);
 
-            case BC_DNEG:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(-t._doubleValue);
-                break;
+            break;
+        case BC_DLOAD1:
+            out << name;
 
-            case BC_INEG:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(-t._intValue);
-                break;
+            value_stack.emplace(1.0);
 
-            case BC_DPRINT:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                cout << t._doubleValue;
-                break;
+            break;
+        case BC_ILOAD1:
+            out << name;
 
-            case BC_IPRINT:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                cout << t._intValue;
-                break;
+            value_stack.emplace(1);
 
-            case BC_SPRINT:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                cout << t._stringValue;
-                break;
+            break;
+        case BC_SLOAD:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 
-            case BC_DSUB:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._doubleValue - b._doubleValue);
-                break;
+            sid = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            value_stack.emplace(constantById(sid));
 
-            case BC_ISUB:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue - b._intValue);
-                break;
+            break;
+        case BC_CALL:
+            out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
 
-            case BC_IMOD:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue % b._intValue);
-                break;
+            fun_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            f = (StackFrame*)functionById(fun_id);
+            call_stack.push_back(*f);
+            stack_size = value_stack.size();
+            status = call(call_stack.size() - 1, out);
+            if(status->isError()) {
+                return status;
+            }
+            diff = stack_size - value_stack.size();
+            if(diff != f->parametersNumber() && diff != f->parametersNumber() - 1) {
+                cerr << "Suspicious value stack size ("
+                     << "was " << stack_size
+                     << ", became " << value_stack.size()
+                     << ") after function call '"
+                     << functionById(fun_id)->name()
+                     << "'" << endl;
+                return Status::Error("Suspicious value stack size", bci);
+            }
+            call_stack.pop_back();
 
-            case BC_IAAND:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue & b._intValue);
-                break;
+            break;
+        case BC_CALLNATIVE:
+            out << name << " *" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            break;
+        case BC_LOADDVAR:
+        case BC_STOREDVAR:
+        case BC_LOADIVAR:
+        case BC_STOREIVAR:
+        case BC_LOADSVAR:
+        case BC_STORESVAR:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            break;
+        case BC_LOADCTXDVAR:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
 
-            case BC_IAOR:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue | b._intValue);
-                break;
+            scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
+            identifier = make_pair(scope_id, var_id);
+            assert(call_stack[call_id].local_vars()->count(identifier) > 0);
+            value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getDoubleValue());
 
-            case BC_IAXOR:
-                out << name;
-                t = value_stack.top();
-                value_stack.pop();
-                b = value_stack.top();
-                value_stack.pop();
-                value_stack.emplace(t._intValue ^ b._intValue);
-                break;
+            break;
+        case BC_STORECTXDVAR:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
+
+            scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
+            identifier = make_pair(scope_id, var_id);
+            t = value_stack.top();
+            value_stack.pop();
+            (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
+            (*call_stack[call_id].local_vars())[identifier].setDoubleValue(t._doubleValue);
+
+            break;
+        case BC_LOADCTXIVAR:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
+
+            scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
+            identifier = make_pair(scope_id, var_id);
+            assert(call_stack[call_id].local_vars()->count(identifier) > 0);
+            value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getIntValue());
+
+            break;
+        case BC_STORECTXIVAR:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
+
+            scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
+            identifier = make_pair(scope_id, var_id);
+            t = value_stack.top();
+            value_stack.pop();
+            (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
+            (*call_stack[call_id].local_vars())[identifier].setIntValue(t._intValue);
+
+            break;
+        case BC_LOADCTXSVAR:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
+
+            scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
+            identifier = make_pair(scope_id, var_id);
+            assert(call_stack[call_id].local_vars()->count(identifier) > 0);
+            value_stack.emplace((*call_stack[call_id].local_vars())[identifier].getStringValue());
+            break;
+        case BC_STORECTXSVAR:
+            out << name << " @" << call_stack[call_id].bytecode()->getUInt16(bci + 1)
+                << ":" << call_stack[call_id].bytecode()->getUInt16(bci + 3);
+
+            scope_id = call_stack[call_id].bytecode()->getUInt16(bci + 1);
+            var_id = call_stack[call_id].bytecode()->getUInt16(bci + 3);
+            identifier = make_pair(scope_id, var_id);
+            t = value_stack.top();
+            value_stack.pop();
+            (*call_stack[call_id].local_vars())[identifier] = var_by_scope[scope_id][var_id];
+            (*call_stack[call_id].local_vars())[identifier].setStringValue(t._stringValue);
+
+            break;
+        case BC_IFICMPNE:
+            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
+
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
+            if(t._intValue != b._intValue) {
+                bci += offset;
+            }
+
+            break;
+        case BC_IFICMPE:
+            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
+
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
+            if(t._intValue == b._intValue) {
+                bci += offset;
+            }
+
+            break;
+        case BC_IFICMPG:
+            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
+
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
+            if(t._intValue > b._intValue) {
+                bci += offset;
+            }
+
+            break;
+        case BC_IFICMPGE:
+            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
+
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
+            if(t._intValue >= b._intValue) {
+                bci += offset;
+            }
+
+            break;
+        case BC_IFICMPL:
+            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
+
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
+            if(t._intValue < b._intValue) {
+                bci += offset;
+            }
+
+            break;
+        case BC_IFICMPLE:
+            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
+
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
+            if(t._intValue <= b._intValue) {
+                bci += offset;
+            }
+
+            break;
+        case BC_JA:
+            out << name << " " << call_stack[call_id].bytecode()->getInt16(bci + 1) + bci + length;// + 1;
+
+            offset = call_stack[call_id].bytecode()->getInt16(bci + 1);
+            bci += offset;
+
+            break;
+        case BC_RETURN:
+            out << name;
+            return Status::Ok();
+
+        case BC_DADD:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._doubleValue + b._doubleValue);
+            break;
+
+        case BC_IADD:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue + b._intValue);
+            break;
+
+        case BC_DCMP:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            if(t._doubleValue < b._doubleValue) {
+                value_stack.emplace(-1);
+            } else if(t._doubleValue == b._doubleValue) {
+                value_stack.emplace(0);
+            } else {
+                value_stack.emplace(1);
+            }
+            break;
+
+        case BC_ICMP:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            if(t._intValue < b._intValue) {
+                value_stack.emplace(-1);
+            } else if(t._intValue == b._intValue) {
+                value_stack.emplace(0);
+            } else {
+                value_stack.emplace(1);
+            }
+            break;
+
+        case BC_DDIV:
+        out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._doubleValue / b._doubleValue);
+            break;
+
+        case BC_IDIV:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue / b._intValue);
+            break;
+
+        case BC_DMUL:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._doubleValue * b._doubleValue);
+            break;
+
+        case BC_IMUL:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue * b._intValue);
+            break;
+
+        case BC_DNEG:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(-t._doubleValue);
+            break;
+
+        case BC_INEG:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(-t._intValue);
+            break;
+
+        case BC_DPRINT:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            cout << t._doubleValue;
+            break;
+
+        case BC_IPRINT:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            cout << t._intValue;
+            break;
+
+        case BC_SPRINT:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            cout << t._stringValue;
+            break;
+
+        case BC_DSUB:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._doubleValue - b._doubleValue);
+            break;
+
+        case BC_ISUB:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue - b._intValue);
+            break;
+
+        case BC_IMOD:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue % b._intValue);
+            break;
+
+        case BC_IAAND:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue & b._intValue);
+            break;
+
+        case BC_IAOR:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue | b._intValue);
+            break;
+
+        case BC_IAXOR:
+            out << name;
+            t = value_stack.top();
+            value_stack.pop();
+            b = value_stack.top();
+            value_stack.pop();
+            value_stack.emplace(t._intValue ^ b._intValue);
+            break;
           default:
                 out << name;
         }
