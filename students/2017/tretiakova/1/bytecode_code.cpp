@@ -101,6 +101,7 @@ uint16_t BytecodeCode::add_scope(Scope* scope) {
             StackFrame* sf = new StackFrame(f);
             uint16_t f_id = addFunction(sf);
             if(f->name() == "<top>") {
+                cerr << "top-top" << endl;
                 top_function_id = f_id;
             }
         }

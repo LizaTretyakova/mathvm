@@ -45,8 +45,7 @@ public:
     BytecodeTranslateVisitor(BytecodeCode* b): bcode(b) {}
 
     Status* get_status();
-    void setTopFunction(AstFunction* f) {
-        StackFrame* sf = new StackFrame(f);
+    void setTopFunction(StackFrame* sf) {
         fun_hierarchy.push_back(sf);
     }
     void unsetTopFunction() {

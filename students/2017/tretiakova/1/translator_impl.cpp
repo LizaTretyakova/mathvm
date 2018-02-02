@@ -55,7 +55,8 @@ Status* BytecodeTranslatorImpl::translate(const string &program, Code* *code) {
     (*code) = new BytecodeCode();
     ((BytecodeCode*)(*code))->add_scope(top->scope());
     BytecodeTranslateVisitor visitor((BytecodeCode*)(*code));
-    visitor.setTopFunction(top);
+    StackFrame* sf = ((BytecodeCode*)(*code))->get_top_function();
+    visitor.setTopFunction(sf);
     top->node()->visit(&visitor);
     visitor.unsetTopFunction();
 

@@ -101,6 +101,10 @@ public:
     void set_var(LocalVar* to, LocalVar* from);
     Status* call(int call_id, ofstream& out);
     virtual Status* execute(vector<Var *> &vars);
+
+    StackFrame* get_top_function() {
+        return (StackFrame*)functionById(top_function_id);
+    }
 };
 
 }
